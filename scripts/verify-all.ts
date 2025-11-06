@@ -40,10 +40,10 @@ async function main() {
   }
 
   const results = {
-    tokens: { verified: 0, failed: 0, skipped: 0 },
-    amm: { verified: 0, failed: 0, skipped: 0 },
-    main: { verified: 0, failed: 0, skipped: 0 },
-    pairs: { verified: 0, failed: 0, skipped: 0 },
+    tokens: { verified: 0, failed: 0 },
+    amm: { verified: 0, failed: 0 },
+    main: { verified: 0, failed: 0 },
+    pairs: { verified: 0, failed: 0 },
   };
 
   const failed: Array<{ type: string; name: string; address: string; error: string }> = [];
@@ -58,7 +58,7 @@ async function main() {
   ) {
     if (!address || address === "null" || address === null) {
       console.log(`⏭️  ${name} - No address found, skipping`);
-      return "skipped";
+      return "failed";
     }
 
     console.log(`\n🔍 Verifying ${name}...`);
@@ -76,15 +76,21 @@ async function main() {
       console.log(`✅ ${name} verified successfully!`);
       return "verified";
     } catch (error: any) {
-      const errorMessage = error.message || String(error);
+      // Extract error message from various possible error formats
+      const errorMessage = error.message || error.reason || String(error);
+      const errorString = String(error).toLowerCase();
 
+      // If already verified, treat as verified (success)
       if (
         errorMessage.includes("Already Verified") ||
         errorMessage.includes("already verified") ||
-        errorMessage.includes("Contract source code already verified")
+        errorMessage.includes("Contract source code already verified") ||
+        errorString.includes("has already been verified") ||
+        errorString.includes("already verified on the block explorer") ||
+        errorString.includes("contract already verified")
       ) {
-        console.log(`⏭️  ${name} already verified`);
-        return "skipped";
+        console.log(`✅ ${name} verified (already verified)`);
+        return "verified";
       } else {
         console.error(`❌ Failed to verify ${name}:`, errorMessage);
         failed.push({
@@ -131,8 +137,7 @@ async function main() {
     const result = await verifyContract("tokens", `${symbol} (${coin.name})`, address, constructorArgs, "MockERC20");
     
     if (result === "verified") results.tokens.verified++;
-    else if (result === "failed") results.tokens.failed++;
-    else results.tokens.skipped++;
+    else results.tokens.failed++;
 
     // Rate limiting
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -150,8 +155,7 @@ async function main() {
   if (factoryAddress) {
     const result = await verifyContract("amm", "SimpleFactory", factoryAddress, [], "SimpleFactory");
     if (result === "verified") results.amm.verified++;
-    else if (result === "failed") results.amm.failed++;
-    else results.amm.skipped++;
+    else results.amm.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -162,8 +166,7 @@ async function main() {
     const routerArgs = [factoryAddress, wethAddress];
     const result = await verifyContract("amm", "SimpleRouter", routerAddress, routerArgs, "SimpleRouter");
     if (result === "verified") results.amm.verified++;
-    else if (result === "failed") results.amm.failed++;
-    else results.amm.skipped++;
+    else results.amm.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -179,8 +182,7 @@ async function main() {
   if (shariaComplianceAddress) {
     const result = await verifyContract("main", "ShariaCompliance", shariaComplianceAddress, [], "ShariaCompliance");
     if (result === "verified") results.main.verified++;
-    else if (result === "failed") results.main.failed++;
-    else results.main.skipped++;
+    else results.main.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -190,8 +192,7 @@ async function main() {
     const swapArgs = [shariaComplianceAddress, routerAddress, wethAddress];
     const result = await verifyContract("main", "ShariaSwap", shariaSwapAddress, swapArgs, "ShariaSwap");
     if (result === "verified") results.main.verified++;
-    else if (result === "failed") results.main.failed++;
-    else results.main.skipped++;
+    else results.main.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -201,8 +202,7 @@ async function main() {
     const dcaArgs = [shariaComplianceAddress, routerAddress, wethAddress];
     const result = await verifyContract("main", "ShariaDCA", shariaDCAAddress, dcaArgs, "ShariaDCA");
     if (result === "verified") results.main.verified++;
-    else if (result === "failed") results.main.failed++;
-    else results.main.skipped++;
+    else results.main.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -222,8 +222,7 @@ async function main() {
     // Pairs are created by factory and have no constructor args (SimplePair constructor is empty)
     const result = await verifyContract("pairs", pairKey, pairAddress as string, [], "SimplePair");
     if (result === "verified") results.pairs.verified++;
-    else if (result === "failed") results.pairs.failed++;
-    else results.pairs.skipped++;
+    else results.pairs.failed++;
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -238,34 +237,27 @@ async function main() {
     results.tokens.verified + results.amm.verified + results.main.verified + results.pairs.verified;
   const totalFailed =
     results.tokens.failed + results.amm.failed + results.main.failed + results.pairs.failed;
-  const totalSkipped =
-    results.tokens.skipped + results.amm.skipped + results.main.skipped + results.pairs.skipped;
 
   console.log("\n📦 Tokens:");
   console.log(`   ✅ Verified: ${results.tokens.verified}`);
-  console.log(`   ⏭️  Already verified: ${results.tokens.skipped}`);
   console.log(`   ❌ Failed: ${results.tokens.failed}`);
 
   console.log("\n🏭 AMM Contracts:");
   console.log(`   ✅ Verified: ${results.amm.verified}`);
-  console.log(`   ⏭️  Already verified: ${results.amm.skipped}`);
   console.log(`   ❌ Failed: ${results.amm.failed}`);
 
   console.log("\n🏛️  Main Contracts:");
   console.log(`   ✅ Verified: ${results.main.verified}`);
-  console.log(`   ⏭️  Already verified: ${results.main.skipped}`);
   console.log(`   ❌ Failed: ${results.main.failed}`);
 
   console.log("\n🔗 Pairs:");
   console.log(`   ✅ Verified: ${results.pairs.verified}`);
-  console.log(`   ⏭️  Already verified: ${results.pairs.skipped}`);
   console.log(`   ❌ Failed: ${results.pairs.failed}`);
 
   console.log("\n" + "=".repeat(60));
   console.log("📊 TOTALS");
   console.log("=".repeat(60));
   console.log(`✅ Verified: ${totalVerified}`);
-  console.log(`⏭️  Already verified: ${totalSkipped}`);
   console.log(`❌ Failed: ${totalFailed}`);
 
   if (failed.length > 0) {
