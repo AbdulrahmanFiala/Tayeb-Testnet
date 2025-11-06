@@ -11,6 +11,7 @@ A comprehensive decentralized platform for Sharia-compliant cryptocurrency inves
 
 ### 2. Token Swapping (ShariaSwap)
 - **Custom AMM**: Built-in Uniswap V2-style AMM for testing
+- **Automatic Routing**: Automatically routes through USDC when direct pairs don't exist
 - **Compliance Enforcement**: Only allows swaps into Sharia-compliant tokens
 - **Swap History**: Track all user swap activities
 - **Price Quotes**: Get swap estimates before execution
@@ -76,7 +77,9 @@ Token swapping with DEX integration and compliance validation.
 - `getSwapQuote(tokenIn, tokenOut, amountIn)` - Get price estimate
 - `getUserSwapHistory(user)` - View swap history
 
-**Note:** Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
+**Features:**
+- **Automatic Routing**: Automatically routes swaps through USDC when a direct pair doesn't exist (e.g., ETH → BTC routes through ETH/USDC → BTC/USDC)
+- Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
 
 ### ShariaDCA.sol
 Automated Dollar Cost Averaging with Chainlink integration.

@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./ShariaCompliance.sol";
 import "./interfaces/IDEXRouter.sol";
+import "./testnet/SimpleFactory.sol";
 
 /**
  * @title ShariaSwap
@@ -25,6 +26,9 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
 
     /// @notice DEX router for swaps (SimpleRouter)
     IDEXRouter public dexRouter;
+
+    /// @notice Factory for checking pair existence
+    SimpleFactory public immutable factory;
 
     /// @notice WETH (Wrapped DEV) address on Moonbase Alpha
     address public immutable WETH;
@@ -89,15 +93,18 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
      * @param _shariaCompliance Address of ShariaCompliance contract
      * @param _dexRouter Address of DEX router (SimpleRouter)
      * @param _weth Address of WETH token (Wrapped DEV)
+     * @param _factory Address of SimpleFactory for pair lookups
      */
     constructor(
         address _shariaCompliance,
         address _dexRouter,
-        address _weth
+        address _weth,
+        address _factory
     ) Ownable(msg.sender) {
         shariaCompliance = ShariaCompliance(_shariaCompliance);
         dexRouter = IDEXRouter(_dexRouter);
         WETH = _weth;
+        factory = SimpleFactory(_factory);
     }
 
     // ============================================================================
@@ -148,10 +155,8 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
         // Approve router if needed
         IERC20(tokenIn).forceApprove(address(dexRouter), amountIn);
 
-        // Build swap path
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = tokenOut;
+        // Build swap path (auto-routes through USDC if no direct pair)
+        address[] memory path = _buildSwapPath(tokenIn, tokenOut);
 
         // Execute swap
         uint256[] memory amounts;
@@ -223,10 +228,8 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
         // Approve router
         IERC20(WETH).forceApprove(address(dexRouter), msg.value);
 
-        // Build swap path
-        address[] memory path = new address[](2);
-        path[0] = WETH;
-        path[1] = tokenOut;
+        // Build swap path (auto-routes through USDC if no direct pair)
+        address[] memory path = _buildSwapPath(WETH, tokenOut);
 
         // Execute swap
         uint256[] memory amounts;
@@ -283,9 +286,8 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
         address tokenOut,
         uint256 amountIn
     ) external view returns (uint256 amountOut) {
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = tokenOut;
+        // Build swap path (auto-routes through USDC if no direct pair)
+        address[] memory path = _buildSwapPath(tokenIn, tokenOut);
 
         uint256[] memory amounts = dexRouter.getAmountsOut(amountIn, path);
         return amounts[amounts.length - 1];
@@ -312,6 +314,42 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
     // ============================================================================
     // INTERNAL FUNCTIONS
     // ============================================================================
+
+    /**
+     * @notice Build optimal swap path (direct or through USDC)
+     * @param tokenIn Input token address
+     * @param tokenOut Output token address
+     * @return path Array of token addresses for the swap
+     */
+    function _buildSwapPath(address tokenIn, address tokenOut) internal view returns (address[] memory path) {
+        // Get USDC address from ShariaCompliance
+        address usdc = shariaCompliance.getTokenAddress("USDC");
+        
+        // If either token is USDC, use direct path
+        if (tokenIn == usdc || tokenOut == usdc) {
+            path = new address[](2);
+            path[0] = tokenIn;
+            path[1] = tokenOut;
+            return path;
+        }
+        
+        // Check if direct pair exists
+        address directPair = factory.getPair(tokenIn, tokenOut);
+        if (directPair != address(0)) {
+            // Direct pair exists, use it
+            path = new address[](2);
+            path[0] = tokenIn;
+            path[1] = tokenOut;
+            return path;
+        }
+        
+        // No direct pair, route through USDC
+        path = new address[](3);
+        path[0] = tokenIn;
+        path[1] = usdc;
+        path[2] = tokenOut;
+        return path;
+    }
 
     /**
      * @notice Record swap in history

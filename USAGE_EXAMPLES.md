@@ -148,6 +148,8 @@ console.log("Coin registered!");
 
 ## Executing Swaps
 
+> **💡 Automatic Routing**: ShariaSwap automatically routes swaps through USDC when a direct pair doesn't exist. For example, swapping ETH → BTC will automatically use the ETH/USDC and BTC/USDC pairs (ETH → USDC → BTC). You don't need to specify the path - the contract handles it automatically!
+
 ### Swap DEV for Token
 
 ```typescript
@@ -184,6 +186,7 @@ console.log("Swap completed!");
 
 ```typescript
 // Swap BTC for ETH
+// Note: If no direct BTC/ETH pair exists, this will automatically route through USDC (BTC → USDC → ETH)
 import halaCoins from './config/halaCoins.json';
 import deployedContracts from './config/deployedContracts.json';
 
@@ -203,12 +206,12 @@ const ETH_ADDRESS = ethCoin?.addresses.moonbase;
 const btcToken = new ethers.Contract(BTC_ADDRESS, ERC20_ABI, signer);
 await btcToken.approve(shariaSwap.target, ethers.MaxUint256);
 
-// Get quote
+// Get quote (automatically uses best path: direct or through USDC)
 const amountIn = ethers.parseUnits("0.1", 8); // 0.1 BTC (8 decimals)
 const quote = await shariaSwap.getSwapQuote(BTC_ADDRESS, ETH_ADDRESS, amountIn);
 console.log(`Expected output: ${ethers.formatEther(quote)} ETH`);
 
-// Execute swap
+// Execute swap (path is automatically determined)
 const minAmountOut = quote * BigInt(95) / BigInt(100); // 5% slippage tolerance
 const deadline = Math.floor(Date.now() / 1000) + 60 * 15;
 

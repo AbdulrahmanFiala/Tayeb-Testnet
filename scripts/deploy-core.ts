@@ -34,8 +34,9 @@ async function main() {
   const contractsConfig = deployedContractsConfig as DeployedContracts;
   const WETH_ADDRESS = contractsConfig.amm.weth || ethers.getAddress("0xD909178CC99d318e4D46e7E66a972955859670E1".toLowerCase());
   const DEX_ROUTER = contractsConfig.amm.router;
+  const FACTORY_ADDRESS = contractsConfig.amm.factory;
 
-  if (!DEX_ROUTER) {
+  if (!DEX_ROUTER || !FACTORY_ADDRESS) {
     console.error("❌ Error: AMM addresses not found in deployedContracts.json!");
     console.log("\n📝 Please run deploy-amm-core.ts first:");
     console.log("   npx hardhat run scripts/deploy-amm-core.ts --network moonbase\n");
@@ -43,6 +44,7 @@ async function main() {
   }
 
   console.log("📖 Using AMM addresses from deployedContracts.json:");
+  console.log("   Factory:", FACTORY_ADDRESS);
   console.log("   Router:", DEX_ROUTER);
   console.log("   WETH:", WETH_ADDRESS);
   console.log();
@@ -74,7 +76,8 @@ async function main() {
       return await ShariaSwap.deploy(
         shariaComplianceAddress,
         DEX_ROUTER,
-        WETH_ADDRESS
+        WETH_ADDRESS,
+        FACTORY_ADDRESS
       );
     }
   );
@@ -214,7 +217,7 @@ async function main() {
   console.log("🔍 Verify contracts on Moonscan (optional) - requires ETHERSCAN_API_KEY");
   console.log("Get API key from: https://moonscan.io/myapikey");
   console.log(`npx hardhat verify --network moonbase ${shariaComplianceAddress}`);
-  console.log(`npx hardhat verify --network moonbase ${shariaSwapAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${WETH_ADDRESS}`);
+  console.log(`npx hardhat verify --network moonbase ${shariaSwapAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${WETH_ADDRESS} ${FACTORY_ADDRESS}`);
   console.log(`npx hardhat verify --network moonbase ${shariaDCAAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${WETH_ADDRESS}`);
 }
 

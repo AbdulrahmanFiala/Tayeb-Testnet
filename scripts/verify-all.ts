@@ -186,10 +186,10 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
-  // ShariaSwap (shariaCompliance, router, weth)
+  // ShariaSwap (shariaCompliance, router, weth, factory)
   const shariaSwapAddress = contractsConfig.main?.shariaSwap;
-  if (shariaSwapAddress && shariaComplianceAddress && routerAddress && wethAddress) {
-    const swapArgs = [shariaComplianceAddress, routerAddress, wethAddress];
+  if (shariaSwapAddress && shariaComplianceAddress && routerAddress && wethAddress && factoryAddress) {
+    const swapArgs = [shariaComplianceAddress, routerAddress, wethAddress, factoryAddress];
     const result = await verifyContract("main", "ShariaSwap", shariaSwapAddress, swapArgs, "ShariaSwap");
     if (result === "verified") results.main.verified++;
     else results.main.failed++;
