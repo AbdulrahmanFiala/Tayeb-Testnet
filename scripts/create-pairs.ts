@@ -9,7 +9,7 @@ import { createOrVerifyPair } from "./utils/deployHelpers";
 /**
  * Create Liquidity Pairs
  * 
- * This script creates liquidity pairs for all non-stablecoins against USDT and USDC.
+ * This script creates liquidity pairs for all non-stablecoins against USDC.
  * 
  * Features:
  * - Idempotent: Skips pairs already created (checks JSON + on-chain)
@@ -49,15 +49,14 @@ async function main() {
   }
 
   // Get stablecoin addresses
-  const mockUSDT = deployedTokens["USDT"];
   const mockUSDC = deployedTokens["USDC"];
 
-  if (!mockUSDT || !mockUSDC) {
-    console.error("❌ USDT or USDC not found. Please ensure tokens are deployed.");
+  if (!mockUSDC) {
+    console.error("❌ USDC not found. Please ensure tokens are deployed.");
     process.exit(1);
   }
 
-  // Create pairs for each non-stablecoin with USDT and USDC
+  // Create pairs for each non-stablecoin with USDC only
   const nonStablecoins = getNonStablecoins(config);
   const pairs: { [key: string]: string } = {};
   let existingPairsCount = 0;
@@ -67,21 +66,22 @@ async function main() {
   
   // Helper to create a pair and track counts
   async function createPairAndTrack(
-    coinSymbol: string,
-    stablecoinSymbol: string,
-    tokenAddress: string,
-    stablecoinAddress: string
+    tokenASymbol: string,
+    tokenBSymbol: string,
+    tokenAAddress: string,
+    tokenBAddress: string
   ) {
-    const pairKey = `${coinSymbol}_${stablecoinSymbol}`;
+    // Use the original order for the pair key to match config
+    const pairKey = `${tokenASymbol}_${tokenBSymbol}`;
     const existingPairAddress = existingPairs[pairKey];
     
     try {
       const pairAddress = await createOrVerifyPair(
-        `${coinSymbol}/${stablecoinSymbol}`,
+        `${tokenASymbol}/${tokenBSymbol}`,
         existingPairAddress,
         factory,
-        tokenAddress,
-        stablecoinAddress
+        tokenAAddress,
+        tokenBAddress
       );
       pairs[pairKey] = pairAddress;
       
@@ -115,15 +115,21 @@ async function main() {
         console.warn(`⚠️  Failed to save ${pairKey} address incrementally, will save at end`);
       }
     } catch (error) {
-      console.error(`❌ Failed to create ${coinSymbol}/${stablecoinSymbol} pair:`, error);
+      console.error(`❌ Failed to create ${tokenASymbol}/${tokenBSymbol} pair:`, error);
     }
   }
   
+  // First, create USDC/USDT pair (stablecoin pair)
+  const mockUSDT = deployedTokens["USDT"];
+  if (mockUSDT) {
+    await createPairAndTrack("USDC", "USDT", mockUSDC, mockUSDT);
+  }
+  
+  // Then create pairs for each non-stablecoin with USDC
   for (const coin of nonStablecoins) {
     const tokenAddress = deployedTokens[coin.symbol];
     
-    // Create pairs with both stablecoins
-    await createPairAndTrack(coin.symbol, "USDT", tokenAddress, mockUSDT);
+    // Create pairs with USDC only
     await createPairAndTrack(coin.symbol, "USDC", tokenAddress, mockUSDC);
   }
   
@@ -176,4 +182,5 @@ main()
     console.error(error);
     process.exit(1);
   });
+
 

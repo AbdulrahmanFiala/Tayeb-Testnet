@@ -18,7 +18,7 @@ async function main() {
   const ROUTER_ADDRESS = "YOUR_ROUTER_ADDRESS";
   const FACTORY_ADDRESS = "YOUR_FACTORY_ADDRESS";
   const TOKEN_A = "YOUR_TOKEN_A_ADDRESS"; // e.g., WETH
-  const TOKEN_B = "YOUR_TOKEN_B_ADDRESS"; // e.g., USDT
+  const TOKEN_B = "YOUR_TOKEN_B_ADDRESS"; // e.g., USDC
   
   // Check if addresses are configured
   if (ROUTER_ADDRESS === "YOUR_ROUTER_ADDRESS") {
@@ -27,7 +27,7 @@ async function main() {
     console.log("   - ROUTER_ADDRESS: SimpleRouter address");
     console.log("   - FACTORY_ADDRESS: SimpleFactory address");
     console.log("   - TOKEN_A: First token address (e.g., WETH)");
-    console.log("   - TOKEN_B: Second token address (e.g., USDT)");
+    console.log("   - TOKEN_B: Second token address (e.g., USDC)");
     return;
   }
 

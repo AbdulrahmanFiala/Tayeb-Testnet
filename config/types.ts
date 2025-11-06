@@ -81,7 +81,7 @@ export interface DeployedContracts {
   amm: DeployedAMM;
   main: DeployedMain;
   tokens: { [key: string]: string | null }; // Token addresses by symbol: e.g., "BTC": "0x..."
-  pairs: { [key: string]: string | null }; // Dedicated pairs section: e.g., "BTC_USDT": "0x..."
+  pairs: { [key: string]: string | null }; // Dedicated pairs section: e.g., "BTC_USDC": "0x..."
   metadata: DeploymentMetadata;
 }
 

@@ -44,7 +44,7 @@ export async function deployOrVerifyContract(
  * Checks if a pair already exists at the given address (on-chain + factory verification).
  * If valid, returns the existing pair address. Otherwise, creates a new pair.
  * 
- * @param pairName - Name of the pair for logging purposes (e.g., "BTC/USDT")
+ * @param pairName - Name of the pair for logging purposes (e.g., "BTC/USDC")
  * @param existingPairAddress - Existing pair address from config (can be null/undefined)
  * @param factory - The factory contract instance
  * @param tokenA - Address of first token
