@@ -85,13 +85,16 @@ Token swapping with DEX integration and compliance validation.
 Automated Dollar Cost Averaging with Chainlink integration.
 
 **Key Functions:**
-- `createDCAOrder(targetSymbol, amountPerInterval, intervalSeconds, totalIntervals)` - Create order (prepaid)
+- `createDCAOrder(sourceSymbol, targetSymbol, amountPerInterval, intervalSeconds, totalIntervals)` - Create order (supports any token → any token)
 - `executeDCAOrder(orderId)` - Execute next interval (manual or automated)
 - `cancelDCAOrder(orderId)` - Cancel and get refund
 - `getDCAOrder(orderId)` - Get order details
 - `getUserOrders(user)` - Get user's orders
 
-**Note:** Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
+**Features:**
+- **Any Token → Any Token DCA**: Deposit DEV, USDC, BTC, or any Sharia-compliant token and DCA into any other token
+- **Automatic Routing**: Uses the same routing logic as ShariaSwap (direct pairs or through USDC)
+- Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
 - `checkUpkeep()` / `performUpkeep()` - Chainlink Automation integration
 
 ## 🚀 Getting Started
@@ -133,6 +136,24 @@ This platform is designed for **Moonbase Alpha (testnet)** only:
 - ✅ No real funds required
 
 For detailed setup instructions, troubleshooting, and post-deployment steps, refer to [SETUP.md](./SETUP.md).
+
+## 🔧 Debugging Tools
+
+### Decode Failed Transactions
+
+Debug failed transactions with the decode script:
+
+```bash
+TX_HASH=0x... npx hardhat run scripts/decode-failed-tx.ts --network moonbase
+```
+
+The script will:
+- Decode function calls and parameters
+- Identify common mistakes (wrong addresses, invalid amounts, etc.)
+- Show revert reasons and error messages
+- Provide troubleshooting guidance
+
+For detailed usage, see [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md#debugging-failed-transactions).
 
 ## 💻 Usage
 
