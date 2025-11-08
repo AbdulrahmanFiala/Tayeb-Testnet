@@ -1,0 +1,14 @@
+stages:
+  - dca
+
+dca_executor:
+  stage: dca
+  image: node:18
+  variables:
+    MOONBASE_RPC_URL: https://rpc.api.moonbase.moonbeam.network
+  script:
+    - npm ci
+    - npx hardhat run scripts/execute-ready-orders.ts --network moonbase
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
