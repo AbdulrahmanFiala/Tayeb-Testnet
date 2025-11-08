@@ -15,7 +15,7 @@ async function main() {
   console.log("Network: Moonbase Alpha");
   console.log("Mode: Local Automation Script");
 
-  const checkInterval = 10000; // Check every 10 seconds
+  const checkInterval = 60000; // Check every 60 seconds
   
   // Track orders currently being processed to prevent duplicate executions
   const pendingOrders = new Set<string>();

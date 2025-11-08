@@ -452,7 +452,7 @@ For automatic DCA execution, use the local automation script:
    ```bash
    npx hardhat run scripts/auto-execute-dca.ts --network moonbase
    ```
-4. The script will check every 10 seconds and execute ready orders automatically
+4. The script will check every 60 seconds and execute ready orders automatically
 5. Keep the script running for continuous automation
 
 ### Manual Execution
