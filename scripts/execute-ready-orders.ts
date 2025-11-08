@@ -4,34 +4,32 @@ import deployedContracts from "../config/deployedContracts.json";
 
 dotenv.config();
 
-/**
- * Helper function to check if a specific order is ready for execution
- */
-async function isOrderReady(shariaDCA: any, orderId: bigint): Promise<boolean> {
+type DCAOrderState = {
+  exists: boolean;
+  isActive: boolean;
+  intervalsCompleted: bigint;
+  totalIntervals: bigint;
+  nextExecutionTime: bigint;
+};
+
+async function getOrderState(
+  shariaDCA: any,
+  orderId: bigint
+): Promise<DCAOrderState | null> {
   try {
-    const order = await shariaDCA.getDCAOrder(orderId);
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    return (
-      order.exists &&
-      order.isActive &&
-      currentTime >= Number(order.nextExecutionTime) &&
-      order.intervalsCompleted < order.totalIntervals
-    );
+    return await shariaDCA.getDCAOrder(orderId);
   } catch {
-    return false;
+    return null;
   }
 }
 
 /**
  * One-time execution script for ready DCA orders
  * Useful for cron jobs, GitHub Actions, or manual execution
- * Automatically catches up on multiple missed intervals per order
  */
 async function main() {
   const startTime = Date.now();
-  const maxCatchUpPerOrder = 10; // Prevent infinite loops
-  
+
   const shariaDCA = await ethers.getContractAt(
     "ShariaDCA",
     deployedContracts.main.shariaDCA
@@ -39,7 +37,6 @@ async function main() {
 
   console.log("🔍 Checking for ready DCA orders...");
   console.log("Contract:", deployedContracts.main.shariaDCA);
-  console.log("Max catch-up per order:", maxCatchUpPerOrder);
   console.log();
 
   try {
@@ -55,100 +52,114 @@ async function main() {
       performData
     )[0];
 
-    console.log(`✅ Found ${orderIds.length} order(s) ready for execution:\n`);
-    orderIds.forEach((id: bigint) => console.log(`  - Order #${id}`));
+    const ordersWithState: Array<{ id: bigint; state: DCAOrderState | null }> = await Promise.all(
+      orderIds.map(async (id: bigint) => ({
+        id,
+        state: await getOrderState(shariaDCA, id)
+      }))
+    );
+
+    console.log(`✅ Found ${ordersWithState.length} order(s) ready for execution:\n`);
+    ordersWithState.forEach(({ id, state }) => {
+      if (!state) {
+        console.log(`  - Order #${id} (state unavailable)`);
+        return;
+      }
+
+      const intervalsCompleted = Number(state.intervalsCompleted);
+      const totalIntervals = Number(state.totalIntervals);
+      console.log(`  - Order #${id} (Interval ${intervalsCompleted + 1}/${totalIntervals})`);
+    });
     console.log();
 
-    // Execute all ready orders with catch-up logic
+    // Execute all ready orders
     const results = [];
-    let totalIntervalsCaughtUp = 0;
+    let totalIntervalsExecuted = 0;
     
-    for (const orderId of orderIds) {
-      let catchUpCount = 0;
+    for (const { id: orderId, state } of ordersWithState) {
       let orderSuccess = true;
       let lastError = null;
       const orderStartTime = Date.now();
       
       console.log(`🔄 Processing Order #${orderId}...`);
-      
-      // Keep executing until order is no longer ready or max retries reached
-      while (catchUpCount < maxCatchUpPerOrder) {
-        try {
-          // Check if order is still ready
-          const isReady = await isOrderReady(shariaDCA, orderId);
-          if (!isReady) {
-            break;
-          }
-          
-          const tx = await shariaDCA.executeDCAOrder(orderId);
-          const receipt = await tx.wait();
-          catchUpCount++;
-          totalIntervalsCaughtUp++;
-          
-          console.log(`   ✅ Interval ${catchUpCount} executed (tx: ${receipt.hash.slice(0, 10)}...)`);
-          
-        } catch (error: any) {
-          console.error(`   ❌ Failed on interval ${catchUpCount + 1}: ${error.message}`);
-          orderSuccess = false;
-          lastError = error.message;
-          break;
+
+      try {
+        if (!state) {
+          throw new Error("Unable to fetch order state");
         }
+        if (!state.exists) {
+          throw new Error("Order does not exist");
+        }
+        if (!state.isActive) {
+          throw new Error("Order is not active");
+        }
+
+        const intervalsCompleted = Number(state.intervalsCompleted);
+        const totalIntervals = Number(state.totalIntervals);
+
+        if (intervalsCompleted >= totalIntervals) {
+          throw new Error("Order already completed");
+        }
+
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (currentTime < Number(state.nextExecutionTime)) {
+          throw new Error("Order not ready yet");
+        }
+
+        const intervalLabel = `${intervalsCompleted + 1}/${totalIntervals}`;
+        console.log(`   🔄 Executing interval ${intervalLabel}...`);
+
+        const tx = await shariaDCA.executeDCAOrder(orderId);
+        console.log(`      Transaction sent: ${tx.hash}`);
+
+        const receipt = await tx.wait();
+        console.log(`   ✅ Order #${orderId} executed successfully! (Interval ${intervalLabel})`);
+        console.log(`      Block: ${receipt.blockNumber}`);
+        console.log(`      Gas used: ${receipt.gasUsed.toString()}\n`);
+
+        totalIntervalsExecuted++;
+      } catch (error: any) {
+        orderSuccess = false;
+        lastError = error.message ?? String(error);
+        const intervalInfo =
+          state && state.exists
+            ? ` (Interval ${Number(state.intervalsCompleted) + 1}/${Number(state.totalIntervals)})`
+            : "";
+        console.error(`   ❌ Failed to execute Order #${orderId}${intervalInfo}: ${lastError}\n`);
       }
-      
+
       const orderDuration = ((Date.now() - orderStartTime) / 1000).toFixed(1);
       
       // Log order completion
-      if (catchUpCount === 0) {
-        console.log(`   ⚠️  No intervals executed (order may not be ready)\n`);
-      } else if (catchUpCount >= maxCatchUpPerOrder) {
-        console.log(`   ⚠️  Max catch-up limit reached (${maxCatchUpPerOrder})`);
-        console.log(`   📊 Caught up ${catchUpCount} intervals in ${orderDuration}s`);
-        console.log(`   ⚠️  Order may have more intervals pending\n`);
-      } else if (orderSuccess) {
-        if (catchUpCount === 1) {
-          console.log(`   ✅ Order executed (1 interval, ${orderDuration}s)\n`);
-        } else {
-          console.log(`   ✅ Order caught up (${catchUpCount} intervals, ${orderDuration}s)\n`);
-        }
-      } else {
-        console.log(`   ❌ Order failed after ${catchUpCount} successful intervals\n`);
-      }
-      
       results.push({
         orderId: orderId.toString(),
         success: orderSuccess,
-        intervalsCaughtUp: catchUpCount,
         duration: orderDuration,
-        error: lastError,
-        hitMaxLimit: catchUpCount >= maxCatchUpPerOrder
+        error: lastError
       });
     }
 
     // Summary
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const successful = results.filter(r => r.success && r.intervalsCaughtUp > 0).length;
+    const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
-    const hitLimit = results.filter(r => r.hitMaxLimit).length;
     
     console.log("=".repeat(60));
     console.log("📊 Execution Summary:");
-    console.log(`   Orders processed: ${orderIds.length}`);
+    console.log(`   Orders processed: ${ordersWithState.length}`);
     console.log(`   Successful: ${successful}`);
     console.log(`   Failed: ${failed}`);
-    if (hitLimit > 0) {
-      console.log(`   ⚠️  Hit catch-up limit: ${hitLimit}`);
-    }
-    console.log(`   Total intervals executed: ${totalIntervalsCaughtUp}`);
+    console.log(`   Total intervals executed: ${totalIntervalsExecuted}`);
     console.log(`   Total duration: ${totalDuration}s`);
     console.log("=".repeat(60));
 
     // Detailed per-order results
-    if (results.length > 1 || results.some(r => r.intervalsCaughtUp > 1)) {
+    if (results.length > 1) {
       console.log("\n📋 Per-Order Details:");
       results.forEach(r => {
         const status = r.success ? "✅" : "❌";
-        const limit = r.hitMaxLimit ? " (limit reached)" : "";
-        console.log(`   ${status} Order #${r.orderId}: ${r.intervalsCaughtUp} interval(s) in ${r.duration}s${limit}`);
+        const errorSuffix = r.success ? "" : ` — ${r.error}`;
+        console.log(`   ${status} Order #${r.orderId}: ${r.duration}s${errorSuffix}`);
       });
     }
 
