@@ -1,0 +1,125 @@
+{
+  "coins": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "decimals": 8,
+      "complianceReason": "Decentralized cryptocurrency, no interest-bearing mechanism",
+      "description": "Leading decentralized cryptocurrency",
+      "addresses": {
+        "moonbase": "0x9C8262260A1Cfcca24a36a2d894c2b836Cb1b4E1"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 18,
+      "complianceReason": "Smart contract platform, utility token",
+      "description": "Decentralized smart contract platform",
+      "addresses": {
+        "moonbase": "0xf99a0892CF3ddDCD93F0428BC5BAaCC0604856f6"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "USDT",
+      "name": "Tether USD",
+      "decimals": 6,
+      "complianceReason": "Stablecoin backed by fiat reserves",
+      "description": "USD-pegged stablecoin",
+      "addresses": {
+        "moonbase": "0x884924C7Ef93081a34bCD4C057434e21A27Dd263"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "XRP",
+      "name": "Ripple",
+      "decimals": 6,
+      "complianceReason": "Digital payment protocol token",
+      "description": "Fast and low-cost cross-border payments",
+      "addresses": {
+        "moonbase": "0x27B76359888E279cDFCCEfD3828B55E14Bd7286D"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "BNB",
+      "name": "Binance Coin",
+      "decimals": 18,
+      "complianceReason": "Utility token for Binance ecosystem",
+      "description": "Native token of Binance exchange and BNB Chain",
+      "addresses": {
+        "moonbase": "0x063Cf054036AA885C27A5508aeD580C7F4c46e0C"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "decimals": 9,
+      "complianceReason": "High-performance blockchain utility token",
+      "description": "High-speed blockchain platform",
+      "addresses": {
+        "moonbase": "0x0FB123556Ad1B84991c96B834e3892845B56B4C2"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "decimals": 6,
+      "complianceReason": "Fully reserved stablecoin",
+      "description": "Fully-backed USD stablecoin",
+      "addresses": {
+        "moonbase": "0x1fc1F3961ed7E9118aBeFDE142362D6FC885319a"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "TRX",
+      "name": "TRON",
+      "decimals": 18,
+      "complianceReason": "Decentralized content platform token",
+      "description": "Decentralized entertainment and content-sharing platform",
+      "addresses": {
+        "moonbase": "0x32602daCA58b4FFcb1d0cB3958C50599a0a42035"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "ADA",
+      "name": "Cardano",
+      "decimals": 6,
+      "complianceReason": "Proof-of-stake blockchain platform token",
+      "description": "Research-driven blockchain platform",
+      "addresses": {
+        "moonbase": "0xcceDDE75b616EcfDFCDd42c6965918b7F1806A4a"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "decimals": 18,
+      "complianceReason": "Oracle network utility token",
+      "description": "Decentralized oracle network",
+      "addresses": {
+        "moonbase": "0x8A8ca8e0fb175E6Ff60eCeeb698f5Ad7e2E74dc8"
+      },
+      "permissible": true
+    },
+    {
+      "symbol": "HBAR",
+      "name": "Hedera",
+      "decimals": 8,
+      "complianceReason": "Proof-of-stake distributed network",
+      "description": "Enterprise-grade public distributed ledger",
+      "addresses": {
+        "moonbase": "0xDB5f7DB2f35CDE7556c9787a02f94eabD876729b"
+      },
+      "permissible": true
+    }
+  ]
+}
