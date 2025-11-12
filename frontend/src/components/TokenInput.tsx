@@ -9,6 +9,7 @@ interface TokenInputProps {
 	placeholder?: string;
 	tokens?: Token[];
 	onTokenChange?: (token: Token) => void;
+	balance?: string;
 }
 
 export function TokenInput({
@@ -20,7 +21,10 @@ export function TokenInput({
 	placeholder = "0",
 	tokens = [],
 	onTokenChange,
+	balance,
 }: TokenInputProps) {
+	const displayBalance = balance !== undefined ? parseFloat(balance).toFixed(6) : "0.000000";
+	
 	return (
 		<div className='bg-[#23483c] rounded-lg p-4 my-2'>
 			{/* Label and Balance */}
@@ -29,7 +33,7 @@ export function TokenInput({
 					{label}
 				</p>
 				<p className='text-white/60 text-sm font-medium leading-normal'>
-					Balance: {value ? value : 0} {token?.symbol}
+					Balance: {displayBalance} {token?.symbol || ""}
 				</p>
 			</div>
 

@@ -1,18 +1,61 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { formatUnits, parseUnits } from "viem";
+import { usePublicClient, useReadContract } from "wagmi";
 import halaCoinsData from "../../../config/halaCoins.json";
 import { TokenInput } from "../components/TokenInput";
+import { SwapConfirmationModal } from "../components/SwapConfirmationModal";
+import { TransactionNotificationList } from "../components/TransactionNotification";
 import { useShariaCompliance } from "../hooks/useShariaCompliance";
 import { useManualSwapQuote, useShariaSwap } from "../hooks/useShariaSwap";
+import { useTokenPrices } from "../hooks/useTokenPrices";
+import { useTokenBalance } from "../hooks/useTokenBalance";
 import { useWallet } from "../hooks/useWallet";
-import type { Token } from "../types";
+import type { Token, TransactionNotification, SwapConfirmationData } from "../types";
+import { ERC20_ABI } from "../config/abis";
 
 export function SwapPage() {
 	const [searchParams] = useSearchParams();
 	const tokenInParam = searchParams.get("tokenIn");
-	const { isConnected } = useWallet();
-	const { swapTokenForToken, isSwapping } = useShariaSwap();
+	const { address, isConnected, isOnMoonbaseAlpha, switchToMoonbaseAlpha, chain } = useWallet();
+	const {
+		approveToken,
+		swapTokenForToken,
+		isSwapping,
+		isConfirming,
+		isConfirmed,
+		txHash,
+		transactionStatus,
+		error: swapError,
+		reset: resetSwap,
+		SHARIA_SWAP_ADDRESS,
+	} = useShariaSwap();
+	const publicClient = usePublicClient();
+
+	// Auto-prompt to switch network on page load if on wrong network
+	useEffect(() => {
+		if (isConnected && !isOnMoonbaseAlpha) {
+			console.warn("⚠️ Wrong network detected! Connected to:", chain?.name, "Chain ID:", chain?.id);
+			console.warn("⚠️ This app requires Moonbase Alpha Testnet (Chain ID: 1287)");
+			// Automatically trigger switch prompt after a brief delay
+			const timer = setTimeout(() => {
+				if (confirm("You're connected to the wrong network. Switch to Moonbase Alpha Testnet now?")) {
+					switchToMoonbaseAlpha();
+				}
+			}, 1000);
+			return () => clearTimeout(timer);
+		}
+	}, [isConnected, isOnMoonbaseAlpha, chain, switchToMoonbaseAlpha]);
+
+	// Debug: Log when isConfirmed changes
+	useEffect(() => {
+		console.log("🎯 isConfirmed changed:", isConfirmed);
+	}, [isConfirmed]);
+
+	// Debug: Log when isConfirming changes
+	useEffect(() => {
+		console.log("⏳ isConfirming changed:", isConfirming);
+	}, [isConfirming]);
 	const { coins, coinsLoading, coinsError } = useShariaCompliance();
 	const { isLoading: quoteLoading, fetchQuote } = useManualSwapQuote();
 
@@ -21,10 +64,38 @@ export function SwapPage() {
 	const [amountIn, setAmountIn] = useState<string>("");
 	const [amountOut, setAmountOut] = useState<number | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	
+	// Fetch token balances
+	const { balance: balanceIn, refetch: refetchBalanceIn } = useTokenBalance(tokenIn);
+	const { balance: balanceOut, refetch: refetchBalanceOut } = useTokenBalance(tokenOut);
+	
+	// Modal and notification state
+	const [showModal, setShowModal] = useState(false);
+	const [confirmationData, setConfirmationData] = useState<SwapConfirmationData | null>(null);
+	const [notifications, setNotifications] = useState<TransactionNotification[]>([]);
+	const [currentTxId, setCurrentTxId] = useState<string | null>(null);
+	
+	// Allowance state
+	const [needsApproval, setNeedsApproval] = useState(false);
+	const [checkingAllowance, setCheckingAllowance] = useState(false);
+	const [isApprovingToken, setIsApprovingToken] = useState(false);
+
 	const slippageTolerance = useMemo(
 		() => tokenOut?.avgSlippagePercent ?? 5,
 		[tokenOut]
 	);
+
+	// Get token prices
+	const tokenSymbols = useMemo(() => {
+		const symbols: string[] = [];
+		if (tokenIn) symbols.push(tokenIn.symbol);
+		if (tokenOut) symbols.push(tokenOut.symbol);
+		return symbols;
+	}, [tokenIn, tokenOut]);
+	
+	const { prices, getPrice, calculateUsdValue } = useTokenPrices(tokenSymbols);
+
+
 
 	// Format tokens: merge smart contract data with halaCoins.json metadata
 	const tokens: Token[] = (coins || []).map((coin) => {
@@ -110,6 +181,52 @@ export function SwapPage() {
 		setTokenOut(selected);
 	};
 
+	// Check token allowance
+	const checkAllowance = async () => {
+		if (!tokenIn || !amountIn || !address || !publicClient) {
+			setNeedsApproval(false);
+			return;
+		}
+
+		// Don't check if amount is invalid
+		const numericAmount = parseFloat(amountIn);
+		if (isNaN(numericAmount) || numericAmount <= 0) {
+			setNeedsApproval(false);
+			return;
+		}
+
+		try {
+			setCheckingAllowance(true);
+			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
+			
+			const allowance = await publicClient.readContract({
+				address: tokenIn.addresses.moonbase as `0x${string}`,
+				abi: ERC20_ABI,
+				functionName: "allowance",
+				args: [address, SHARIA_SWAP_ADDRESS],
+			}) as bigint;
+
+			console.log("🔍 Allowance check:", {
+				token: tokenIn.symbol,
+				allowance: allowance.toString(),
+				required: amountInWei.toString(),
+				needsApproval: allowance < amountInWei,
+			});
+
+			setNeedsApproval(allowance < amountInWei);
+		} catch (err) {
+			console.error("Error checking allowance:", err);
+			setNeedsApproval(true); // Assume needs approval on error
+		} finally {
+			setCheckingAllowance(false);
+		}
+	};
+
+	// Check allowance whenever relevant dependencies change
+	useEffect(() => {
+		checkAllowance();
+	}, [tokenIn, amountIn, address, publicClient]);
+
 	// Fetch quote on amount change
 	const handleAmountChange = async (value: string) => {
 		setAmountIn(value);
@@ -117,6 +234,7 @@ export function SwapPage() {
 		// Clear output if input is empty or invalid
 		if (!value || value === "" || isNaN(parseFloat(value))) {
 			setAmountOut(null);
+			setNeedsApproval(false);
 			return;
 		}
 
@@ -140,6 +258,7 @@ export function SwapPage() {
 			}
 		} else {
 			setAmountOut(null);
+			setNeedsApproval(false);
 		}
 	};
 
@@ -181,7 +300,8 @@ export function SwapPage() {
 	// 	}
 	// };
 
-	const handleSwap = async () => {
+	// Open confirmation modal with calculated data
+	const handleReviewSwap = () => {
 		if (!amountIn || !tokenIn || !tokenOut || !isConnected) {
 			setError("Please fill in all fields and connect wallet");
 			return;
@@ -192,14 +312,75 @@ export function SwapPage() {
 			return;
 		}
 
+		if (!amountOut || amountOut <= 0) {
+			setError("Unable to get quote. Please try again.");
+			return;
+		}
+
+		setError(null);
+
+		// Calculate values
+		const amountInNum = parseFloat(amountIn);
+		const amountOutNum = amountOut;
+		const exchangeRate = (amountOutNum / amountInNum).toFixed(6);
+		
+		// Calculate USD values
+		const amountInUsd = calculateUsdValue(tokenIn.symbol, amountInNum);
+		const amountOutUsd = calculateUsdValue(tokenOut.symbol, amountOutNum);
+		
+		// Calculate fee (0.25%)
+		const feeAmount = amountInNum * 0.0025;
+		const feeUsd = calculateUsdValue(tokenIn.symbol, feeAmount);
+		
+		// Calculate minimum amount out after slippage
+		const minAmountOut = (amountOutNum * (100 - slippageTolerance)) / 100;
+
+		const data: SwapConfirmationData = {
+			tokenIn,
+			tokenOut,
+			amountIn,
+			amountOut: amountOutNum.toFixed(6),
+			amountInUsd,
+			amountOutUsd,
+			exchangeRate,
+			priceImpact: 0, // Removed but keeping in type for compatibility
+			fee: `${feeAmount.toFixed(8)} ${tokenIn.symbol}`,
+			feeUsd,
+			slippageTolerance,
+			minAmountOut: minAmountOut.toFixed(6),
+		};
+
+		setConfirmationData(data);
+		setShowModal(true);
+	};
+
+	// Execute the swap after confirmation
+	const handleConfirmSwap = async () => {
+		if (!confirmationData || !tokenIn || !tokenOut) return;
+
 		try {
 			setError(null);
+			// Generate a unique transaction ID for tracking
+			const txId = `swap-${Date.now()}`;
+			setCurrentTxId(txId);
+
+			// Create initial notification immediately
+			const newNotification: TransactionNotification = {
+				id: txId,
+				status: "pending",
+				type: "swap",
+				tokenIn: tokenIn,
+				tokenOut: tokenOut,
+				amountIn,
+				amountOut: amountOut?.toFixed(6),
+			};
+			setNotifications((prev) => [...prev, newNotification]);
+
 			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
 			const amountOutWei = parseUnits(
-				(amountOut as number)?.toString(),
+				confirmationData.amountOut,
 				tokenOut.decimals
 			);
-			// Use avgSlippagePercent from token data; fallback to 5%
 			const slippagePercent = tokenOut.avgSlippagePercent ?? 5;
 			const minAmountOut =
 				(amountOutWei * BigInt(100 - slippagePercent)) / 100n;
@@ -210,22 +391,189 @@ export function SwapPage() {
 				amountInWei,
 				minAmountOut
 			);
-
-			setAmountIn("");
-			setAmountOut(null);
-			alert("Swap successful!");
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "Swap failed";
 			setError(message);
 			console.error("Swap error:", err);
+			
+			// Update notification to error
+			if (currentTxId) {
+				setNotifications((prev) =>
+					prev.map((n) =>
+						n.id === currentTxId
+							? { ...n, status: "error", message }
+							: n
+					)
+				);
+			}
 		}
+	};
+
+	// Handle token approval (separate transaction)
+	const handleApproveToken = async () => {
+		if (!tokenIn || !amountIn || !address) return;
+
+		try {
+			setIsApprovingToken(true);
+			
+			// Generate a unique transaction ID for tracking
+			const txId = `approve-${Date.now()}`;
+			setCurrentTxId(txId);
+
+			// Create approval notification
+			const approvalNotification: TransactionNotification = {
+				id: txId,
+				status: "pending",
+				type: "approve",
+				tokenIn: tokenIn,
+				amountIn,
+				message: `Approving ${tokenIn.symbol}`,
+			};
+			setNotifications((prev) => [...prev, approvalNotification]);
+
+			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
+			
+			// Approve maximum amount to avoid future approvals
+			const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+			
+			await approveToken(
+				tokenIn.addresses.moonbase as `0x${string}`,
+				maxApproval
+			);
+
+			console.log("✅ Approval transaction sent");
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Approval failed";
+			setError(message);
+			console.error("Approval error:", err);
+			
+			// Update notification to error
+			if (currentTxId) {
+				setNotifications((prev) =>
+					prev.map((n) =>
+						n.id === currentTxId
+							? { ...n, status: "error", message }
+							: n
+					)
+				);
+			}
+			setIsApprovingToken(false);
+		}
+	};
+
+
+	// Close modal when transaction is sent
+	useEffect(() => {
+		if (isSwapping && showModal) {
+			// Transaction has been sent to wallet and signed, close modal
+			setShowModal(false);
+		}
+	}, [isSwapping, showModal]);
+
+	// Separate effect specifically for transaction confirmation
+	useEffect(() => {
+		console.log("🎬 Confirmation Effect Triggered:", { isConfirmed, currentTxId });
+		
+		if (isConfirmed && currentTxId) {
+			console.log("✅ Transaction CONFIRMED! Updating notification to SUCCESS");
+			
+			const isApprovalTx = currentTxId.startsWith("approve-");
+			
+			setNotifications((prev) => {
+				console.log("Previous notifications:", prev);
+				const updated = prev.map((n) => {
+					console.log("Checking notification:", n.id, "against currentTxId:", currentTxId);
+					return n.id === currentTxId
+						? { ...n, status: "success" as const }
+						: n;
+				});
+				console.log("Updated notifications:", updated);
+				return updated;
+			});
+
+			if (isApprovalTx) {
+				// Approval successful - re-check allowance and enable swap
+				console.log("✅ Approval successful! Re-checking allowance...");
+				setIsApprovingToken(false);
+				setTimeout(async () => {
+					await checkAllowance();
+					setCurrentTxId(null);
+					resetSwap();
+				}, 1500);
+			} else {
+				// Swap successful - reset form and refetch balances
+				setAmountIn("");
+				setAmountOut(null);
+				setConfirmationData(null);
+				setNeedsApproval(false);
+				
+				// Refetch token balances
+				refetchBalanceIn();
+				refetchBalanceOut();
+				
+				// Reset swap state for next transaction
+				setTimeout(() => {
+					console.log("🔄 Resetting swap state");
+					setCurrentTxId(null);
+					resetSwap();
+				}, 2000);
+			}
+		}
+	}, [isConfirmed, currentTxId, resetSwap]);
+
+	// Track transaction hash
+	useEffect(() => {
+		if (txHash && currentTxId) {
+			console.log("📝 Transaction hash available:", txHash);
+			setNotifications((prev) =>
+				prev.map((n) =>
+					n.id === currentTxId
+						? { ...n, txHash }
+						: n
+				)
+			);
+		}
+	}, [txHash, currentTxId]);
+
+	// Track errors
+	useEffect(() => {
+		if (swapError && currentTxId) {
+			console.log("❌ Transaction ERROR:", swapError.message);
+			setNotifications((prev) =>
+				prev.map((n) =>
+					n.id === currentTxId && n.status !== "error"
+						? { ...n, status: "error", message: swapError.message || "Transaction failed" }
+						: n
+				)
+			);
+			setCurrentTxId(null);
+		}
+	}, [swapError, currentTxId]);
+
+	// General status logging
+	useEffect(() => {
+		if (!currentTxId) return;
+		
+		console.log("🔍 Transaction Status Update:", {
+			currentTxId,
+			transactionStatus,
+			txHash,
+			isConfirmed,
+			isConfirming,
+			isSwapping,
+			swapError: swapError?.message,
+		});
+	}, [currentTxId, transactionStatus, txHash, isConfirmed, isConfirming, isSwapping, swapError]);
+
+	// Handle notification dismissal
+	const handleDismissNotification = (id: string) => {
+		setNotifications((prev) => prev.filter((n) => n.id !== id));
 	};
 
 	const exchangeRate =
 		amountIn && amountOut && parseFloat(amountIn) > 0
 			? (amountOut / parseFloat(amountIn)).toFixed(6)
 			: "0";
-	// const estimatedGas = "0.0042"; // Placeholder
 
 	return (
 		<main className='flex flex-1 justify-center py-10 sm:py-16 px-4'>
@@ -233,6 +581,32 @@ export function SwapPage() {
 				<h1 className='text-white tracking-light text-[32px] font-bold leading-tight text-center pb-6'>
 					Swap Tokens
 				</h1>
+
+				{/* CRITICAL: Wrong Network Warning */}
+				{isConnected && !isOnMoonbaseAlpha && (
+					<div className='mb-4 p-4 bg-red-500/20 border-2 border-red-500 rounded-lg text-red-400'>
+						<div className='flex items-start gap-3'>
+							<span className='material-symbols-outlined text-red-500 text-2xl'>
+								warning
+							</span>
+							<div className='flex-1'>
+								<div className='font-bold text-lg mb-1'>⚠️ WRONG NETWORK!</div>
+								<div className='text-sm mb-3'>
+									You're connected to <strong>{chain?.name || "wrong network"}</strong>.
+									This app only works on <strong>Moonbase Alpha Testnet</strong> (DEV tokens).
+									<br/>
+									<strong className='text-red-300'>Transactions will FAIL and waste real money!</strong>
+								</div>
+								<button
+									onClick={switchToMoonbaseAlpha}
+									className='px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-colors'
+								>
+									Switch to Moonbase Alpha Testnet
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Loading State */}
 				{coinsLoading && (
@@ -266,6 +640,7 @@ export function SwapPage() {
 							token={tokenIn}
 							tokens={tokens}
 							onTokenChange={handleTokenInChange}
+							balance={balanceIn}
 						/>
 						{/* Swap Direction Button */}
 						{/* <div className='flex justify-center items-center h-0 z-10 relative'>
@@ -286,21 +661,55 @@ export function SwapPage() {
 							token={tokenOut}
 							tokens={tokens}
 							onTokenChange={handleTokenOutChange}
+							balance={balanceOut}
 						/>
 						<div className='pt-4'>
-							<button
-								onClick={handleSwap}
-								disabled={
-									isSwapping ||
-									quoteLoading ||
-									!amountIn ||
-									parseFloat(amountIn) <= 0 ||
-									isNaN(parseFloat(amountIn))
-								}
-								className='flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-14 px-5 bg-primary text-background-dark text-lg font-bold leading-normal tracking-wide hover:opacity-90 transition-opacity disabled:opacity-20 disabled:cursor-not-allowed'
-							>
-								{isSwapping ? "..." : "Swap"}
-							</button>
+							{needsApproval ? (
+								<button
+									onClick={handleApproveToken}
+									disabled={
+										isApprovingToken ||
+										isSwapping ||
+										checkingAllowance ||
+										!amountIn ||
+										!amountOut ||
+										!isConnected ||
+										!isOnMoonbaseAlpha
+									}
+									className='flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-14 px-5 bg-primary text-background-dark text-lg font-bold leading-normal tracking-wide hover:opacity-90 transition-opacity disabled:opacity-20 disabled:cursor-not-allowed'
+								>
+									{isApprovingToken
+										? "Approving..."
+										: checkingAllowance
+										? "Checking..."
+										: `Approve ${tokenIn?.symbol || "Token"}`}
+								</button>
+							) : (
+								<button
+									onClick={handleReviewSwap}
+									disabled={
+										isSwapping ||
+										isApprovingToken ||
+										quoteLoading ||
+										checkingAllowance ||
+										!amountIn ||
+										!amountOut ||
+										parseFloat(amountIn) <= 0 ||
+										isNaN(parseFloat(amountIn)) ||
+										!isConnected ||
+										!isOnMoonbaseAlpha
+									}
+									className='flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-14 px-5 bg-primary text-background-dark text-lg font-bold leading-normal tracking-wide hover:opacity-90 transition-opacity disabled:opacity-20 disabled:cursor-not-allowed'
+								>
+									{!isOnMoonbaseAlpha && isConnected
+										? "Wrong Network"
+										: quoteLoading
+										? "Getting quote..."
+										: checkingAllowance
+										? "Checking..."
+										: "Review Swap"}
+								</button>
+							)}
 						</div>
 					</div>
 				)}
@@ -331,6 +740,22 @@ export function SwapPage() {
 					</div>
 				)}
 			</div>
+
+			{/* Confirmation Modal */}
+			{confirmationData && (
+				<SwapConfirmationModal
+					data={confirmationData}
+					isOpen={showModal}
+					onConfirm={handleConfirmSwap}
+					onCancel={() => setShowModal(false)}
+				/>
+			)}
+
+			{/* Transaction Notifications */}
+			<TransactionNotificationList
+				notifications={notifications}
+				onDismiss={handleDismissNotification}
+			/>
 		</main>
 	);
 }

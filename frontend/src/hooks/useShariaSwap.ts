@@ -5,28 +5,81 @@ import {
 	usePublicClient,
 	useReadContract,
 	useWriteContract,
+	useWaitForTransactionReceipt,
 } from "wagmi";
 import { ERC20_ABI, ShariaSwapABI } from "../config/abis";
 import deployedContracts from "../../../config/deployedContracts.json";
 import { getTokenDecimals } from "../config/tokenDecimals";
+import type { TransactionStatus } from "../types";
 
 const SHARIA_SWAP_ADDRESS = (
 	deployedContracts as unknown as { main: { shariaSwap: string } }
 ).main.shariaSwap as Address;
 
 /**
- * Refactored swap hook using Wagmi v2 + Viem
- * Replaces the old useShariaSwap hook
+ * Refactored swap hook using Wagmi v2 + Viem with transaction tracking
  */
 export function useShariaSwap() {
 	const { address: userAddress } = useAccount();
-	const { writeContract, isPending: isWriting } = useWriteContract();
+	const publicClient = usePublicClient();
+	const { 
+		writeContract, 
+		isPending: isWriting,
+		data: txHash,
+		error: writeError,
+		reset: resetWrite,
+	} = useWriteContract();
+
+	// Wait for transaction confirmation
+	const {
+		isLoading: isConfirming,
+		isSuccess: isConfirmed,
+		isError: isConfirmError,
+		error: confirmError,
+	} = useWaitForTransactionReceipt({
+		hash: txHash,
+	});
+
+	// Calculate transaction status
+	const getTransactionStatus = (): TransactionStatus => {
+		if (isWriting || isConfirming) return "pending";
+		if (isConfirmed) return "success";
+		if (writeError || isConfirmError) return "error";
+		return "idle";
+	};
+
+	// Estimate gas for transaction
+	const estimateSwapGas = async (
+		tokenIn: Address,
+		tokenOut: Address,
+		amountIn: bigint,
+		minAmountOut: bigint
+	): Promise<bigint | null> => {
+		if (!publicClient || !userAddress) return null;
+
+		try {
+			const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 15);
+			
+			const gasEstimate = await publicClient.estimateContractGas({
+				address: SHARIA_SWAP_ADDRESS,
+				abi: ShariaSwapABI,
+				functionName: "swapShariaCompliant",
+				args: [tokenIn, tokenOut, amountIn, minAmountOut, deadline],
+				account: userAddress,
+			});
+
+			return gasEstimate;
+		} catch (err) {
+			console.error("Failed to estimate gas:", err);
+			return null;
+		}
+	};
 
 	// Approve token spending
-	const approveToken = (tokenAddress: Address, amount: bigint) => {
+	const approveToken = async (tokenAddress: Address, amount: bigint) => {
 		if (!userAddress) throw new Error("Wallet not connected");
 
-		writeContract({
+		return writeContract({
 			address: tokenAddress,
 			abi: ERC20_ABI,
 			functionName: "approve",
@@ -35,7 +88,7 @@ export function useShariaSwap() {
 	};
 
 	// Execute swap token for token
-	const swapTokenForToken = (
+	const swapTokenForToken = async (
 		tokenIn: Address,
 		tokenOut: Address,
 		amountIn: bigint,
@@ -43,7 +96,7 @@ export function useShariaSwap() {
 	) => {
 		const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 15);
 
-		writeContract({
+		return writeContract({
 			address: SHARIA_SWAP_ADDRESS,
 			abi: ShariaSwapABI,
 			functionName: "swapShariaCompliant",
@@ -52,14 +105,14 @@ export function useShariaSwap() {
 	};
 
 	// Swap GLMR for token
-	const swapGLMRForToken = (
+	const swapGLMRForToken = async (
 		tokenOut: Address,
 		minAmountOut: bigint,
 		amountIn: bigint
 	) => {
 		const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 15);
 
-		writeContract({
+		return writeContract({
 			address: SHARIA_SWAP_ADDRESS,
 			abi: ShariaSwapABI,
 			functionName: "swapGLMRForToken",
@@ -72,9 +125,16 @@ export function useShariaSwap() {
 		approveToken,
 		swapTokenForToken,
 		swapGLMRForToken,
+		estimateSwapGas,
 		isApproving: isWriting,
 		isSwapping: isWriting,
 		isSwappingGLMR: isWriting,
+		isConfirming,
+		isConfirmed,
+		txHash,
+		transactionStatus: getTransactionStatus(),
+		error: writeError || confirmError,
+		reset: resetWrite,
 		SHARIA_SWAP_ADDRESS,
 	};
 }

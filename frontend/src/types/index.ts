@@ -42,3 +42,40 @@ export interface SwapState {
 	loading: boolean;
 	error: string | null;
 }
+
+export interface TokenPrice {
+	symbol: string;
+	usd: number;
+	lastUpdated: number;
+}
+
+export interface SwapConfirmationData {
+	tokenIn: Token;
+	tokenOut: Token;
+	amountIn: string;
+	amountOut: string;
+	amountInUsd?: number;
+	amountOutUsd?: number;
+	exchangeRate: string;
+	priceImpact: number;
+	fee: string;
+	feeUsd?: number;
+	networkCost?: string;
+	networkCostUsd?: number;
+	slippageTolerance: number;
+	minAmountOut: string;
+}
+
+export type TransactionStatus = "idle" | "pending" | "success" | "error";
+
+export interface TransactionNotification {
+	id: string;
+	status: TransactionStatus;
+	type: "swap" | "approve";
+	tokenIn?: Token;
+	tokenOut?: Token;
+	amountIn?: string;
+	amountOut?: string;
+	message?: string;
+	txHash?: string;
+}
