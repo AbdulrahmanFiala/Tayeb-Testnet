@@ -46,7 +46,7 @@ export function useShariaSwap() {
 		writeContract({
 			address: SHARIA_SWAP_ADDRESS,
 			abi: ShariaSwapABI,
-			functionName: "swapTokenForToken",
+			functionName: "swapShariaCompliant",
 			args: [tokenIn, tokenOut, amountIn, minAmountOut, deadline],
 		});
 	};

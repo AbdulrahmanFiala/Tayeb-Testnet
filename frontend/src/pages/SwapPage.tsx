@@ -14,11 +14,11 @@ export function SwapPage() {
 	const { isConnected } = useWallet();
 	const { swapTokenForToken, isSwapping } = useShariaSwap();
 	const { coins, coinsLoading, coinsError } = useShariaCompliance();
-	const { isLoading: quoteLoading, fetchQuote } = useManualSwapQuote(); // ✅ NEW
+	const { isLoading: quoteLoading, fetchQuote } = useManualSwapQuote();
 
 	const [tokenIn, setTokenIn] = useState<Token | null>(null);
 	const [tokenOut, setTokenOut] = useState<Token | null>(null);
-	const [amountIn, setAmountIn] = useState<number | null>(null);
+	const [amountIn, setAmountIn] = useState<string>("");
 	const [amountOut, setAmountOut] = useState<number | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const slippageTolerance = useMemo(
@@ -92,7 +92,7 @@ export function SwapPage() {
 			const tempToken = tokenIn;
 			setTokenIn(selected);
 			setTokenOut(tempToken);
-			handleAmountChange(amountIn as number);
+			handleAmountChange(amountIn);
 			return;
 		}
 		setTokenIn(selected);
@@ -104,22 +104,28 @@ export function SwapPage() {
 			const tempToken = tokenOut;
 			setTokenOut(selected);
 			setTokenIn(tempToken);
-			handleAmountChange(amountIn as number);
+			handleAmountChange(amountIn);
 			return;
 		}
 		setTokenOut(selected);
 	};
 
-	// ✅ NEW: Fetch quote on specific event (amount input change)
-	const handleAmountChange = async (value: number) => {
-		setAmountIn(value ?? null);
+	// Fetch quote on amount change
+	const handleAmountChange = async (value: string) => {
+		setAmountIn(value);
+
+		// Clear output if input is empty or invalid
+		if (!value || value === "" || isNaN(parseFloat(value))) {
+			setAmountOut(null);
+			return;
+		}
 
 		// Trigger quote fetch on amount change
-		if (value > 0 && tokenIn && tokenOut) {
+		if (parseFloat(value) > 0 && tokenIn && tokenOut) {
 			const decimalsIn = tokenIn.decimals ?? 18;
 			const decimalsOut = tokenOut.decimals ?? 18;
 
-			const amountInWei = parseUnits(value.toString(), decimalsIn);
+			const amountInWei = parseUnits(value, decimalsIn);
 			const quote = await fetchQuote(
 				tokenIn.addresses.moonbase as `0x${string}`,
 				tokenOut.addresses.moonbase as `0x${string}`,
@@ -181,9 +187,14 @@ export function SwapPage() {
 			return;
 		}
 
+		if (parseFloat(amountIn) <= 0 || isNaN(parseFloat(amountIn))) {
+			setError("Please enter a valid amount");
+			return;
+		}
+
 		try {
 			setError(null);
-			const amountInWei = parseUnits(amountIn?.toString(), tokenIn.decimals);
+			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
 			const amountOutWei = parseUnits(
 				(amountOut as number)?.toString(),
 				tokenOut.decimals
@@ -200,7 +211,7 @@ export function SwapPage() {
 				minAmountOut
 			);
 
-			setAmountIn(null);
+			setAmountIn("");
 			setAmountOut(null);
 			alert("Swap successful!");
 		} catch (err) {
@@ -211,12 +222,14 @@ export function SwapPage() {
 	};
 
 	const exchangeRate =
-		amountIn && amountOut ? (amountOut / amountIn).toFixed(2) : "0";
+		amountIn && amountOut && parseFloat(amountIn) > 0
+			? (amountOut / parseFloat(amountIn)).toFixed(6)
+			: "0";
 	// const estimatedGas = "0.0042"; // Placeholder
 
 	return (
 		<main className='flex flex-1 justify-center py-10 sm:py-16 px-4'>
-			<div className='flex flex-col w-full max-w-lg'>
+				<div className='flex flex-col w-full max-w-lg'>
 				<h1 className='text-white tracking-light text-[32px] font-bold leading-tight text-center pb-6'>
 					Swap Tokens
 				</h1>
@@ -248,8 +261,8 @@ export function SwapPage() {
 						{/* From Token Section */}
 						<TokenInput
 							label='You Pay'
-							value={(amountIn as number)?.toString()}
-							onChange={(value) => handleAmountChange(Number(value))}
+							value={amountIn}
+							onChange={handleAmountChange}
 							token={tokenIn}
 							tokens={tokens}
 							onTokenChange={handleTokenInChange}
@@ -277,7 +290,13 @@ export function SwapPage() {
 						<div className='pt-4'>
 							<button
 								onClick={handleSwap}
-								disabled={isSwapping || quoteLoading || !amountIn}
+								disabled={
+									isSwapping ||
+									quoteLoading ||
+									!amountIn ||
+									parseFloat(amountIn) <= 0 ||
+									isNaN(parseFloat(amountIn))
+								}
 								className='flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-14 px-5 bg-primary text-background-dark text-lg font-bold leading-normal tracking-wide hover:opacity-90 transition-opacity disabled:opacity-20 disabled:cursor-not-allowed'
 							>
 								{isSwapping ? "..." : "Swap"}

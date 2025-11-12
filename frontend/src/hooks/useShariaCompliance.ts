@@ -12,7 +12,7 @@ const SHARIA_COMPLIANCE_ADDRESS = (
  * Type matching the smart contract's ShariaCoin struct
  */
 export interface ShariaCoin {
-	id: bigint;
+	id: string;
 	name: string;
 	symbol: string;
 	tokenAddress: Address;
