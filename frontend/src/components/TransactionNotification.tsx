@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { TransactionNotification as TxNotification } from "../types";
+import { CryptoTokenIcon } from "./CryptoTokenIcon";
 
 interface TransactionNotificationProps {
 	notification: TxNotification;
@@ -90,16 +91,12 @@ export function TransactionNotification({
 					<div className='flex items-center gap-2'>
 						{/* Token Icons for Swap */}
 						{type === "swap" && tokenIn && tokenOut && (
-							<div className='flex items-center -space-x-2'>
-								<div className='size-6 rounded-full bg-primary/20 border-2 border-[#1a3a2f] flex items-center justify-center'>
-									<span className='text-xs font-bold text-primary'>
-										{tokenIn.symbol.charAt(0)}
-									</span>
+							<div className='flex items-center -space-x-1'>
+								<div className='relative z-10'>
+									<CryptoTokenIcon symbol={tokenIn.symbol} className="size-6" />
 								</div>
-								<div className='size-6 rounded-full bg-primary/20 border-2 border-[#1a3a2f] flex items-center justify-center'>
-									<span className='text-xs font-bold text-primary'>
-										{tokenOut.symbol.charAt(0)}
-									</span>
+								<div className='relative z-0'>
+									<CryptoTokenIcon symbol={tokenOut.symbol} className="size-6" />
 								</div>
 							</div>
 						)}

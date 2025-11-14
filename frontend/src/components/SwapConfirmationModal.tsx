@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SwapConfirmationData } from "../types";
+import { CryptoTokenIcon } from "./CryptoTokenIcon";
 
 interface SwapConfirmationModalProps {
 	data: SwapConfirmationData;
@@ -15,6 +16,14 @@ export function SwapConfirmationModal({
 	onCancel,
 }: SwapConfirmationModalProps) {
 	const [showMore, setShowMore] = useState(false);
+	const [isRateReversed, setIsRateReversed] = useState(false);
+
+	// Reset rate reversal when modal opens/closes or data changes
+	useEffect(() => {
+		if (isOpen) {
+			setIsRateReversed(false);
+		}
+	}, [isOpen, data.exchangeRate]);
 
 	if (!isOpen) return null;
 
@@ -23,22 +32,18 @@ export function SwapConfirmationModal({
 		tokenOut,
 		amountIn,
 		amountOut,
-		amountInUsd,
-		amountOutUsd,
 		exchangeRate,
 		fee,
-		feeUsd,
 		slippageTolerance,
 		minAmountOut,
 	} = data;
 
-	const formatUsd = (value?: number) => {
-		if (value === undefined) return "";
-		return `$${value.toLocaleString(undefined, {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2,
-		})}`;
-	};
+	// Calculate reversed rate
+	const rateValue = parseFloat(exchangeRate);
+	const reversedRate = rateValue > 0 ? (1 / rateValue).toFixed(6) : "0";
+	const displayRate = isRateReversed ? reversedRate : exchangeRate;
+	const displayTokenIn = isRateReversed ? tokenOut : tokenIn;
+	const displayTokenOut = isRateReversed ? tokenIn : tokenOut;
 
 	return (
 		<>
@@ -66,21 +71,12 @@ export function SwapConfirmationModal({
 					</div>
 
 					{/* Token In */}
-					<div className='flex items-center justify-between mb-2'>
-						<div className='flex items-center gap-3'>
-							<div className='size-10 rounded-full bg-primary/20 flex items-center justify-center'>
-								<span className='text-lg font-bold text-primary'>
-									{tokenIn.symbol.charAt(0)}
-								</span>
-							</div>
+					<div className='flex items-center gap-3 mb-2'>
+						<CryptoTokenIcon symbol={tokenIn.symbol} className="size-10" />
 							<div>
 								<div className='text-white text-2xl font-bold'>{amountIn}</div>
 								<div className='text-white/60 text-sm'>{tokenIn.symbol}</div>
 							</div>
-						</div>
-						{amountInUsd !== undefined && (
-							<div className='text-white/80 text-base'>{formatUsd(amountInUsd)}</div>
-						)}
 					</div>
 
 					{/* Arrow Down */}
@@ -93,21 +89,12 @@ export function SwapConfirmationModal({
 					</div>
 
 					{/* Token Out */}
-					<div className='flex items-center justify-between mb-6'>
-						<div className='flex items-center gap-3'>
-							<div className='size-10 rounded-full bg-primary/20 flex items-center justify-center'>
-								<span className='text-lg font-bold text-primary'>
-									{tokenOut.symbol.charAt(0)}
-								</span>
-							</div>
+					<div className='flex items-center gap-3 mb-6'>
+						<CryptoTokenIcon symbol={tokenOut.symbol} className="size-10" />
 							<div>
 								<div className='text-white text-2xl font-bold'>{amountOut}</div>
 								<div className='text-white/60 text-sm'>{tokenOut.symbol}</div>
 							</div>
-						</div>
-						{amountOutUsd !== undefined && (
-							<div className='text-white/80 text-base'>{formatUsd(amountOutUsd)}</div>
-						)}
 					</div>
 
 					{/* Divider */}
@@ -115,25 +102,29 @@ export function SwapConfirmationModal({
 
 					{/* Details */}
 					<div className='space-y-3 mb-4'>
-						{/* Exchange Rate */}
-						<div className='flex items-center justify-between text-sm'>
-							<span className='text-white/70'>Rate</span>
+					{/* Exchange Rate */}
+					<div className='flex items-center justify-between text-sm'>
+						<span className='text-white/70'>Exchange Rate</span>
+						<div className='flex items-center gap-2'>
 							<span className='text-white font-medium'>
-								1 {tokenIn.symbol} = {exchangeRate} {tokenOut.symbol}
+								1 {displayTokenIn.symbol} = {displayRate} {displayTokenOut.symbol}
 							</span>
+							<button
+								onClick={() => setIsRateReversed(!isRateReversed)}
+								className='flex items-center justify-center'
+								aria-label='Reverse exchange rate'
+							>
+								<span className='material-symbols-outlined text-white/70'>
+									swap_horiz
+								</span>
+							</button>
 						</div>
+					</div>
 
 						{/* Fee */}
 						<div className='flex items-center justify-between text-sm'>
-							<div className='flex items-center gap-1'>
-								<span className='text-white/70'>Fee (0.25%)</span>
-								<span className='material-symbols-outlined text-white/50 text-base'>
-									info
-								</span>
-							</div>
-							<div className='text-right'>
-								<div className='text-white font-medium'>{formatUsd(feeUsd)}</div>
-							</div>
+							<span className='text-white/70'>Fee (0.3%)</span>
+							<span className='text-white font-medium'>{fee}</span>
 						</div>
 					</div>
 
@@ -157,12 +148,7 @@ export function SwapConfirmationModal({
 						<div className='space-y-3 mt-3 pt-3 border-t border-white/10'>
 							{/* Min Received */}
 							<div className='flex items-center justify-between text-sm'>
-								<div className='flex items-center gap-1'>
 									<span className='text-white/70'>Minimum received</span>
-									<span className='material-symbols-outlined text-white/50 text-base'>
-										info
-									</span>
-								</div>
 								<span className='text-white font-medium'>
 									{minAmountOut} {tokenOut.symbol}
 								</span>

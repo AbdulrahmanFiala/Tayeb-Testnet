@@ -82,6 +82,14 @@ export function SwapPage() {
 	const [needsApproval, setNeedsApproval] = useState(false);
 	const [checkingAllowance, setCheckingAllowance] = useState(false);
 	const [isApprovingToken, setIsApprovingToken] = useState(false);
+	
+	// Exchange rate reversal state
+	const [isRateReversed, setIsRateReversed] = useState(false);
+	
+	// Reset rate reversal when tokens or amounts change
+	useEffect(() => {
+		setIsRateReversed(false);
+	}, [tokenIn, tokenOut, amountIn, amountOut]);
 
 	const slippageTolerance = useMemo(
 		() => tokenOut?.avgSlippagePercent ?? 5,
@@ -305,8 +313,8 @@ export function SwapPage() {
 		const amountInUsd = calculateUsdValue(tokenIn.symbol, amountInNum);
 		const amountOutUsd = calculateUsdValue(tokenOut.symbol, amountOutNum);
 		
-		// Calculate fee (0.25%)
-		const feeAmount = amountInNum * 0.0025;
+		// Calculate fee (0.3%)
+		const feeAmount = amountInNum * 0.003;
 		const feeUsd = calculateUsdValue(tokenIn.symbol, feeAmount);
 		
 		// Calculate minimum amount out after slippage
@@ -341,26 +349,17 @@ export function SwapPage() {
 			const txId = `swap-${Date.now()}`;
 			setCurrentTxId(txId);
 
-			// Create initial notification immediately
-			const newNotification: TransactionNotification = {
-				id: txId,
-				status: "pending",
-				type: "swap",
-				tokenIn: tokenIn,
-				tokenOut: tokenOut,
-				amountIn,
-				amountOut: amountOut?.toFixed(6),
-			};
-			setNotifications((prev) => [...prev, newNotification]);
+			// Don't create notification here - wait for txHash (after wallet confirmation)
 
 			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
 			const amountOutWei = parseUnits(
 				confirmationData.amountOut,
 				tokenOut.decimals
 			);
-			const slippagePercent = tokenOut.avgSlippagePercent ?? 5;
+			// Use slippageTolerance (already calculated) and ensure it's an integer
+			const slippagePercentInt = Math.floor(slippageTolerance);
 			const minAmountOut =
-				(amountOutWei * BigInt(100 - slippagePercent)) / 100n;
+				(amountOutWei * BigInt(100 - slippagePercentInt)) / 100n;
 
 			await swapTokenForToken(
 				tokenIn.addresses.moonbase as `0x${string}`,
@@ -373,7 +372,7 @@ export function SwapPage() {
 			setError(friendlyMessage);
 			console.error("Swap error:", err);
 			
-			// Update notification to error
+			// Update notification to error if it exists
 			if (currentTxId) {
 				setNotifications((prev) =>
 					prev.map((n) =>
@@ -383,6 +382,8 @@ export function SwapPage() {
 					)
 				);
 			}
+			// Clear currentTxId on error so user can try again
+			setCurrentTxId(null);
 		}
 	};
 
@@ -397,16 +398,7 @@ export function SwapPage() {
 			const txId = `approve-${Date.now()}`;
 			setCurrentTxId(txId);
 
-			// Create approval notification
-			const approvalNotification: TransactionNotification = {
-				id: txId,
-				status: "pending",
-				type: "approve",
-				tokenIn: tokenIn,
-				amountIn,
-				message: `Approving ${tokenIn.symbol}`,
-			};
-			setNotifications((prev) => [...prev, approvalNotification]);
+			// Don't create notification here - wait for txHash (after wallet confirmation)
 
 			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
 			
@@ -424,7 +416,7 @@ export function SwapPage() {
 			setError(friendlyMessage);
 			console.error("Approval error:", err);
 			
-			// Update notification to error
+			// Update notification to error if it exists
 			if (currentTxId) {
 				setNotifications((prev) =>
 					prev.map((n) =>
@@ -434,6 +426,8 @@ export function SwapPage() {
 					)
 				);
 			}
+			// Clear currentTxId on error so user can try again
+			setCurrentTxId(null);
 			setIsApprovingToken(false);
 		}
 	};
@@ -498,19 +492,56 @@ export function SwapPage() {
 		}
 	}, [isConfirmed, currentTxId, resetSwap]);
 
-	// Track transaction hash
+	// Track transaction hash - create notification only after wallet confirmation
 	useEffect(() => {
 		if (txHash && currentTxId) {
-			console.log("📝 Transaction hash available:", txHash);
-			setNotifications((prev) =>
-				prev.map((n) =>
-					n.id === currentTxId
-						? { ...n, txHash }
-						: n
-				)
-			);
+			console.log("📝 Transaction hash available (wallet confirmed):", txHash);
+			
+			// Check if notification already exists (shouldn't, but just in case)
+			const existingNotification = notifications.find(n => n.id === currentTxId);
+			
+			if (!existingNotification) {
+				// Determine transaction type from currentTxId prefix
+				const isApproval = currentTxId.startsWith("approve-");
+				
+				if (isApproval && tokenIn) {
+					// Create approval notification only after transaction is sent to wallet
+					const approvalNotification: TransactionNotification = {
+						id: currentTxId,
+						status: "pending",
+						type: "approve",
+						tokenIn: tokenIn,
+						amountIn,
+						message: `Approving ${tokenIn.symbol}`,
+						txHash,
+					};
+					setNotifications((prev) => [...prev, approvalNotification]);
+				} else if (!isApproval && tokenIn && tokenOut) {
+					// Create swap notification only after transaction is sent to wallet
+					const swapNotification: TransactionNotification = {
+						id: currentTxId,
+						status: "pending",
+						type: "swap",
+						tokenIn: tokenIn,
+						tokenOut: tokenOut,
+						amountIn,
+						amountOut: amountOut?.toFixed(6),
+						txHash,
+					};
+					setNotifications((prev) => [...prev, swapNotification]);
+				}
+			} else {
+				// Update existing notification with txHash
+				setNotifications((prev) =>
+					prev.map((n) =>
+						n.id === currentTxId
+							? { ...n, txHash }
+							: n
+					)
+				);
+			}
 		}
-	}, [txHash, currentTxId]);
+	}, [txHash, currentTxId, tokenIn, tokenOut, amountIn, amountOut, notifications]);
 
 	// Track errors
 	useEffect(() => {
@@ -557,10 +588,18 @@ export function SwapPage() {
 		setNotifications((prev) => prev.filter((n) => n.id !== id));
 	};
 
-	const exchangeRate =
-		amountIn && amountOut && parseFloat(amountIn) > 0
-			? (amountOut / parseFloat(amountIn)).toFixed(6)
-			: "0";
+	// Calculate exchange rate - show placeholder if no amount entered
+	const hasAmount = amountIn && amountOut && parseFloat(amountIn) > 0;
+	const exchangeRate = hasAmount
+		? (amountOut / parseFloat(amountIn)).toFixed(6)
+		: null;
+	
+	// Calculate reversed rate
+	const rateValue = exchangeRate ? parseFloat(exchangeRate) : 0;
+	const reversedRate = rateValue > 0 ? (1 / rateValue).toFixed(6) : null;
+	const displayRate = isRateReversed ? reversedRate : exchangeRate;
+	const displayTokenIn = isRateReversed ? tokenOut : tokenIn;
+	const displayTokenOut = isRateReversed ? tokenIn : tokenOut;
 
 	return (
 		<main className='flex flex-1 justify-center py-10 sm:py-16 px-4'>
@@ -675,6 +714,8 @@ export function SwapPage() {
 								<button
 									onClick={handleReviewSwap}
 									disabled={
+										// Only disable during active wallet prompt (isSwapping), not during confirmation
+										// This allows reviewing a new swap even if a previous one is being confirmed
 										isSwapping ||
 										isApprovingToken ||
 										quoteLoading ||
@@ -706,7 +747,30 @@ export function SwapPage() {
 					<div className='mt-4 p-4 text-sm text-white/70 space-y-2'>
 						<div className='flex justify-between items-center'>
 							<span>Exchange Rate</span>
-							<span className='text-primary/80'>${exchangeRate}</span>
+							{displayTokenIn && displayTokenOut && (
+								<div className='flex items-center gap-2'>
+									{displayRate ? (
+										<>
+											<span className='text-primary/80'>
+												1 {displayTokenIn.symbol} = {displayRate} {displayTokenOut.symbol}
+											</span>
+											<button
+												onClick={() => setIsRateReversed(!isRateReversed)}
+												className='flex items-center justify-center'
+												aria-label='Reverse exchange rate'
+											>
+												<span className='material-symbols-outlined text-primary/80'>
+													swap_horiz
+												</span>
+											</button>
+										</>
+									) : (
+										<span className='text-white/40 text-sm'>
+											Enter amount to see rate
+										</span>
+									)}
+								</div>
+							)}
 						</div>
 						{/* <div className='flex justify-between items-center'>
 							<span>Estimated Gas Fee</span>
