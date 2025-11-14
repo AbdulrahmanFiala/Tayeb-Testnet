@@ -28,8 +28,7 @@ export function HomePage() {
 				</div>
 				<h1 className='text-5xl font-bold text-white mb-4'>Welcome to Tayeb</h1>
 				<p className='text-xl text-[#92c9b7] mb-8'>
-					The Sharia-compliant DeFi platform for secure and ethical crypto
-					trading.
+					The First Fully Sharia-Compliant DEX for Halal Crypto Trading
 				</p>
 				<div className='flex gap-4 justify-center flex-wrap'>
 					<button
