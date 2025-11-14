@@ -277,6 +277,20 @@ export const ShariaDCAABI = [
 		stateMutability: "view",
 	},
 	{
+		type: "function",
+		name: "blockTime",
+		inputs: [],
+		outputs: [{ name: "", type: "uint256" }],
+		stateMutability: "view",
+	},
+	{
+		type: "function",
+		name: "blocksBeforeHour",
+		inputs: [],
+		outputs: [{ name: "", type: "uint256" }],
+		stateMutability: "view",
+	},
+	{
 		type: "event",
 		name: "DCAOrderCreated",
 		inputs: [

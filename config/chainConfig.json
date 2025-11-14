@@ -1,0 +1,18 @@
+{
+  "moonbase": {
+    "blockTime": 6,
+    "blocksBeforeHour": 2,
+    "description": "Moonbase Alpha Testnet - 6 second blocks"
+  },
+  "moonbeam": {
+    "blockTime": 12,
+    "blocksBeforeHour": 3,
+    "description": "Moonbeam Mainnet - 12 second blocks"
+  },
+  "hardhat": {
+    "blockTime": 1,
+    "blocksBeforeHour": 1,
+    "description": "Hardhat local network - 1 second blocks"
+  }
+}
+

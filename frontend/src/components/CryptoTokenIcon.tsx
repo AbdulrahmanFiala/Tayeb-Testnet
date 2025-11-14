@@ -15,7 +15,6 @@ const TOKEN_LOGOS: Record<string, string> = {
 	HDX: "https://assets.coingecko.com/coins/images/18185/small/hydradx.png",
 	GLMR: "https://assets.coingecko.com/coins/images/22459/small/glmr.png",
 	DEV: "https://assets.coingecko.com/coins/images/22459/small/glmr.png",
-	// Additional tokens
 	XRP: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
 	BNB: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
 	SOL: "https://assets.coingecko.com/coins/images/4128/small/solana.png",

@@ -7,6 +7,7 @@ import { useShariaCompliance } from "../hooks/useShariaCompliance";
 import { useShariaDCA, useDCAOrders } from "../hooks/useShariaDCA";
 import { useWallet } from "../hooks/useWallet";
 import { TransactionNotificationList } from "../components/TransactionNotification";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { getFriendlyErrorMessage, isUserRejection } from "../utils/errorMessages";
 import halaCoinsData from "../../../config/halaCoins.json";
 import type { Token, TransactionNotification } from "../types";
@@ -39,6 +40,10 @@ export const DCAOrdersPage: React.FC = () => {
 	const [notifications, setNotifications] = useState<TransactionNotification[]>([]);
 	const [currentTxId, setCurrentTxId] = useState<string | null>(null);
 	const [approvalConfirmed, setApprovalConfirmed] = useState<number>(0);
+	const [cancelConfirmModal, setCancelConfirmModal] = useState<{
+		isOpen: boolean;
+		orderId: bigint | null;
+	}>({ isOpen: false, orderId: null });
 	
 	// Track if we're currently in an approval transaction
 	const isApprovalInProgress = useMemo(() => {
@@ -153,9 +158,17 @@ export const DCAOrdersPage: React.FC = () => {
 	};
 
 
-	// Handle order cancellation
-	const handleCancelOrder = async (orderId: bigint) => {
-		if (!confirm("Are you sure you want to cancel this DCA order?")) return;
+	// Handle order cancellation - show confirmation modal
+	const handleCancelOrder = (orderId: bigint) => {
+		setCancelConfirmModal({ isOpen: true, orderId });
+	};
+	
+	// Confirm cancellation
+	const confirmCancelOrder = () => {
+		if (!cancelConfirmModal.orderId) return;
+		
+		const orderId = cancelConfirmModal.orderId;
+		setCancelConfirmModal({ isOpen: false, orderId: null });
 
 		const txId = `dca-cancel-${Date.now()}`;
 		setCurrentTxId(txId);
@@ -172,6 +185,11 @@ export const DCAOrdersPage: React.FC = () => {
 
 		// Cancel order (errors will be handled by effects)
 		cancelDCAOrder(orderId);
+	};
+	
+	// Cancel confirmation modal
+	const cancelConfirmModalClose = () => {
+		setCancelConfirmModal({ isOpen: false, orderId: null });
 	};
 
 	// Track transaction confirmation
@@ -324,6 +342,17 @@ export const DCAOrdersPage: React.FC = () => {
 			<TransactionNotificationList
 				notifications={notifications}
 				onDismiss={handleDismissNotification}
+			/>
+			
+			{/* Cancel Confirmation Modal */}
+			<ConfirmModal
+				isOpen={cancelConfirmModal.isOpen}
+				title="Cancel DCA Order"
+				message="Are you sure you want to cancel this DCA order? This action cannot be undone."
+				confirmText="Yes, Cancel Order"
+				cancelText="Keep Order"
+				onConfirm={confirmCancelOrder}
+				onCancel={cancelConfirmModalClose}
 			/>
 		</main>
 	);

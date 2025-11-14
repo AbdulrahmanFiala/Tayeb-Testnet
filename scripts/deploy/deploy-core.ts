@@ -1,9 +1,11 @@
 import { ethers } from "hardhat";
+import hre from "hardhat";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
 import halaCoinsConfig from "../../config/halaCoins.json";
 import deployedContractsConfig from "../../config/deployedContracts.json";
+import chainConfig from "../../config/chainConfig.json";
 import { HalaCoinsConfig, DeployedContracts } from "../../config/types";
 import { deployOrVerifyContract } from "../utils/deployHelpers";
 
@@ -88,6 +90,16 @@ async function main() {
   // Deploy ShariaDCA (Idempotent)
   // ============================================================================
   console.log("📅 Deploying ShariaDCA...");
+  
+  // Get block time configuration from chainConfig.json
+  const networkName = hre.network.name;
+  const networkConfig = (chainConfig as any)[networkName];
+  const BLOCK_TIME = networkConfig?.blockTime || 6; // Default to 6 if not found
+  const BLOCKS_BEFORE_HOUR = networkConfig?.blocksBeforeHour || 2; // Default to 2 if not found
+  
+  console.log(`   Using chain config for ${networkName}:`);
+  console.log(`   Block time: ${BLOCK_TIME} seconds`);
+  console.log(`   Blocks before hour: ${BLOCKS_BEFORE_HOUR} (${BLOCKS_BEFORE_HOUR * BLOCK_TIME}s buffer)`);
   const shariaDCAAddress = await deployOrVerifyContract(
     "ShariaDCA",
     contractsConfig.main.shariaDCA,
@@ -97,7 +109,9 @@ async function main() {
         shariaComplianceAddress,
         DEX_ROUTER,
         FACTORY_ADDRESS,
-        WETH_ADDRESS
+        WETH_ADDRESS,
+        BLOCK_TIME,
+        BLOCKS_BEFORE_HOUR
       );
     }
   );
@@ -219,7 +233,7 @@ async function main() {
   console.log("Get API key from: https://moonscan.io/myapikey");
   console.log(`npx hardhat verify --network moonbase ${shariaComplianceAddress}`);
   console.log(`npx hardhat verify --network moonbase ${shariaSwapAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${WETH_ADDRESS} ${FACTORY_ADDRESS}`);
-  console.log(`npx hardhat verify --network moonbase ${shariaDCAAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${FACTORY_ADDRESS} ${WETH_ADDRESS}`);
+  console.log(`npx hardhat verify --network moonbase ${shariaDCAAddress} ${shariaComplianceAddress} ${DEX_ROUTER} ${FACTORY_ADDRESS} ${WETH_ADDRESS} ${BLOCK_TIME} ${BLOCKS_BEFORE_HOUR}`);
 }
 
 main()

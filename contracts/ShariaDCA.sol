@@ -52,6 +52,15 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
     /// @notice Maximum interval between executions (30 days)
     uint256 public constant MAX_INTERVAL = 30 days;
 
+    /// @notice Block time in seconds (configurable via constructor or setBlockTime)
+    uint256 public blockTime;
+    
+    /// @notice Number of blocks before hour to make orders ready (configurable via constructor or setBlocksBeforeHour)
+    uint256 public blocksBeforeHour;
+    
+    /// @notice Hour in seconds (constant)
+    uint256 private constant HOUR_IN_SECONDS = 3600;
+
     // ============================================================================
     // STRUCTS
     // ============================================================================
@@ -126,12 +135,19 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
         address _shariaCompliance,
         address _dexRouter,
         address _factory,
-        address _weth
+        address _weth,
+        uint256 _blockTime,
+        uint256 _blocksBeforeHour
     ) Ownable(msg.sender) {
+        require(_blockTime > 0 && _blockTime <= 60, "Invalid block time");
+        require(_blocksBeforeHour > 0 && _blocksBeforeHour <= 10, "Invalid blocks");
+        
         shariaCompliance = ShariaCompliance(_shariaCompliance);
         dexRouter = IDEXRouter(_dexRouter);
         factory = SimpleFactory(_factory);
         WETH = _weth;
+        blockTime = _blockTime;
+        blocksBeforeHour = _blocksBeforeHour;
     }
 
     // ============================================================================
@@ -144,6 +160,54 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
      */
     function updateDexRouter(address _newRouter) external onlyOwner {
         dexRouter = IDEXRouter(_newRouter);
+    }
+
+    /**
+     * @notice Update block time (in seconds)
+     * @param _blockTime New block time (must be between 1 and 60 seconds)
+     */
+    function setBlockTime(uint256 _blockTime) external onlyOwner {
+        require(_blockTime > 0 && _blockTime <= 60, "Invalid block time");
+        blockTime = _blockTime;
+    }
+
+    /**
+     * @notice Update number of blocks before hour to make orders ready
+     * @param _blocks Number of blocks (must be between 1 and 10)
+     */
+    function setBlocksBeforeHour(uint256 _blocks) external onlyOwner {
+        require(_blocks > 0 && _blocks <= 10, "Invalid blocks");
+        blocksBeforeHour = _blocks;
+    }
+
+    // ============================================================================
+    // INTERNAL HELPER FUNCTIONS
+    // ============================================================================
+
+    /**
+     * @notice Round timestamp to next hour boundary minus blocks (configurable)
+     * @dev Ensures orders are ready when hourly cron job runs
+     * @param timestamp Current timestamp
+     * @return Rounded timestamp (next hour - blocks * blockTime)
+     */
+    function _roundToNextHourMinusBlocks(uint256 timestamp) internal view returns (uint256) {
+        // Round to next hour: ((timestamp / 3600) + 1) * 3600
+        // Then subtract blocks * blockTime seconds
+        return ((timestamp / HOUR_IN_SECONDS) + 1) * HOUR_IN_SECONDS - (blocksBeforeHour * blockTime);
+    }
+
+    /**
+     * @notice Calculate next execution time for subsequent executions
+     * @dev For hourly: round to next hour. For daily/weekly: add interval then round
+     * @param currentTime Current block timestamp
+     * @param interval Order interval in seconds
+     * @return Next execution time rounded to hour boundary minus blocks
+     */
+    function _calculateNextExecutionTime(uint256 currentTime, uint256 interval) internal view returns (uint256) {
+        // Add interval first (for daily/weekly orders)
+        uint256 nextExecution = currentTime + interval;
+        // Then round to next hour minus blocks
+        return _roundToNextHourMinusBlocks(nextExecution);
     }
 
     // ============================================================================
@@ -195,7 +259,8 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
         order.interval = intervalSeconds;
         order.intervalsCompleted = 0;
         order.totalIntervals = totalIntervals;
-        order.nextExecutionTime = block.timestamp + intervalSeconds;
+        // Round to next hour boundary minus blocks (configurable) for cron job alignment
+        order.nextExecutionTime = _roundToNextHourMinusBlocks(block.timestamp);
         order.startTime = block.timestamp;
         order.isActive = true;
         order.exists = true;
@@ -275,7 +340,8 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
         order.interval = intervalSeconds;
         order.intervalsCompleted = 0;
         order.totalIntervals = totalIntervals;
-        order.nextExecutionTime = block.timestamp + intervalSeconds;
+        // Round to next hour boundary minus blocks (configurable) for cron job alignment
+        order.nextExecutionTime = _roundToNextHourMinusBlocks(block.timestamp);
         order.startTime = block.timestamp;
         order.isActive = true;
         order.exists = true;
@@ -352,7 +418,8 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
 
         // Update order
         order.intervalsCompleted++;
-        order.nextExecutionTime = block.timestamp + order.interval;
+        // Round to next hour boundary minus blocks (configurable) for subsequent executions
+        order.nextExecutionTime = _calculateNextExecutionTime(block.timestamp, order.interval);
 
         emit DCAOrderExecuted(
             orderId,
