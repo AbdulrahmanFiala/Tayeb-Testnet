@@ -13,14 +13,22 @@ interface DCAOrdersListProps {
 export function DCAOrdersList({ orders, tokens, isLoading, onCancelOrder }: DCAOrdersListProps) {
 	const [activeTab, setActiveTab] = useState<"all" | "open" | "history">("all");
 
-	// Filter orders based on active tab
+	// Filter and sort orders based on active tab (newest first)
 	const filteredOrders = useMemo(() => {
-		return orders.filter((order) => {
-			if (activeTab === "all") return true;
-			if (activeTab === "open") return order.isActive;
-			if (activeTab === "history") return !order.isActive;
-			return true;
-		});
+		return orders
+			.filter((order) => {
+				if (activeTab === "all") return true;
+				if (activeTab === "open") return order.isActive;
+				if (activeTab === "history") return !order.isActive;
+				return true;
+			})
+			.sort((a, b) => {
+				// Sort by startTime descending (newest first), fallback to id if startTime is same
+				if (a.startTime !== b.startTime) {
+					return Number(b.startTime - a.startTime);
+				}
+				return Number(b.id - a.id);
+			});
 	}, [orders, activeTab]);
 
 	// Helper to find token by address
