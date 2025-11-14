@@ -18,6 +18,34 @@ const MOCK_PRICES: Record<string, number> = {
 	GLMR: 0.5,
 };
 
+// Mapping from token symbol to CoinGecko ID
+const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
+	BTC: "bitcoin",
+	WBTC: "wrapped-bitcoin",
+	ETH: "ethereum",
+	WETH: "ethereum",
+	USDT: "tether",
+	USDC: "usd-coin",
+	DAI: "dai",
+	LINK: "chainlink",
+	UNI: "uniswap",
+	AAVE: "aave",
+	MATIC: "matic-network",
+	XRP: "ripple",
+	BNB: "binancecoin",
+	SOL: "solana",
+	TRX: "tron",
+	ADA: "cardano",
+	HBAR: "hedera-hashgraph",
+	BCH: "bitcoin-cash",
+	LEO: "leo-token",
+	XLM: "stellar",
+	SUI: "sui",
+	AVAX: "avalanche-2",
+	DEV: "moonbeam", // Moonbase native token - using Moonbeam as proxy
+	GLMR: "moonbeam",
+};
+
 interface PriceCache {
 	[symbol: string]: TokenPrice;
 }
@@ -48,9 +76,12 @@ export function useTokenPrices(symbols: string[]) {
 
 			// Check cache first
 			for (const symbol of symbols) {
-				const cached = priceCache[symbol.toUpperCase()];
-				if (cached && now - cached.lastUpdated < CACHE_DURATION) {
-					newPrices[symbol.toUpperCase()] = cached;
+				const symbolUpper = symbol.toUpperCase();
+				const cached = priceCache[symbolUpper];
+				// Only use cache if it has all required data (price and market cap) and is not expired
+				// Allow marketCap to be 0, but reject undefined/null
+				if (cached && now - cached.lastUpdated < CACHE_DURATION && cached.usd && cached.marketCap !== undefined && cached.marketCap !== null) {
+					newPrices[symbolUpper] = cached;
 				} else {
 					symbolsToFetch.push(symbol);
 				}
@@ -63,23 +94,83 @@ export function useTokenPrices(symbols: string[]) {
 				return;
 			}
 
-			// Try to fetch from CoinGecko (or use mock prices)
+			// Try to fetch from CoinGecko
 			try {
-				// For now, use mock prices (in production, you'd call CoinGecko API here)
-				// const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+				// Map symbols to CoinGecko IDs and group them
+				const coingeckoIds: string[] = [];
+				const symbolToIdMap: Record<string, string> = {};
 				
 				for (const symbol of symbolsToFetch) {
 					const symbolUpper = symbol.toUpperCase();
-					const mockPrice = MOCK_PRICES[symbolUpper] || 1;
-					
-					const priceData: TokenPrice = {
-						symbol: symbolUpper,
-						usd: mockPrice,
-						lastUpdated: now,
-					};
+					const coingeckoId = SYMBOL_TO_COINGECKO_ID[symbolUpper];
+					if (coingeckoId) {
+						if (!coingeckoIds.includes(coingeckoId)) {
+							coingeckoIds.push(coingeckoId);
+						}
+						symbolToIdMap[symbolUpper] = coingeckoId;
+					}
+				}
 
-					newPrices[symbolUpper] = priceData;
-					priceCache[symbolUpper] = priceData;
+				// Fetch from CoinGecko API if we have valid IDs
+				if (coingeckoIds.length > 0) {
+					const idsParam = coingeckoIds.join(",");
+					const response = await fetch(
+						`https://api.coingecko.com/api/v3/simple/price?ids=${idsParam}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`
+					);
+
+					if (!response.ok) {
+						throw new Error(`CoinGecko API error: ${response.status}`);
+					}
+
+					const data = await response.json();
+
+					// Process fetched prices
+					for (const symbol of symbolsToFetch) {
+						const symbolUpper = symbol.toUpperCase();
+						const coingeckoId = symbolToIdMap[symbolUpper];
+						
+						if (coingeckoId && data[coingeckoId]) {
+							const coinData = data[coingeckoId];
+							const priceData: TokenPrice = {
+								symbol: symbolUpper,
+								usd: coinData.usd || 0,
+								change24h: coinData.usd_24h_change || 0,
+								marketCap: coinData.usd_market_cap || 0,
+								lastUpdated: now,
+							};
+
+							newPrices[symbolUpper] = priceData;
+							priceCache[symbolUpper] = priceData;
+						} else {
+							// Fallback to mock price if CoinGecko ID not found
+							const mockPrice = MOCK_PRICES[symbolUpper] || 1;
+							const priceData: TokenPrice = {
+								symbol: symbolUpper,
+								usd: mockPrice,
+								marketCap: 0, // No market cap available for unmapped tokens
+								lastUpdated: now,
+							};
+
+							newPrices[symbolUpper] = priceData;
+							priceCache[symbolUpper] = priceData;
+						}
+					}
+				} else {
+					// No CoinGecko IDs found, use mock prices
+					for (const symbol of symbolsToFetch) {
+						const symbolUpper = symbol.toUpperCase();
+						const mockPrice = MOCK_PRICES[symbolUpper] || 1;
+						
+						const priceData: TokenPrice = {
+							symbol: symbolUpper,
+							usd: mockPrice,
+							marketCap: 0, // No market cap available for unmapped tokens
+							lastUpdated: now,
+						};
+
+						newPrices[symbolUpper] = priceData;
+						priceCache[symbolUpper] = priceData;
+					}
 				}
 
 				setPrices(newPrices);
@@ -95,6 +186,7 @@ export function useTokenPrices(symbols: string[]) {
 					const priceData: TokenPrice = {
 						symbol: symbolUpper,
 						usd: mockPrice,
+						marketCap: 0, // No market cap available on error
 						lastUpdated: now,
 					};
 
@@ -115,6 +207,8 @@ export function useTokenPrices(symbols: string[]) {
 		loading,
 		error,
 		getPrice: (symbol: string) => prices[symbol.toUpperCase()]?.usd || 0,
+		getChange24h: (symbol: string) => prices[symbol.toUpperCase()]?.change24h || 0,
+		getMarketCap: (symbol: string) => prices[symbol.toUpperCase()]?.marketCap || 0,
 		calculateUsdValue: (symbol: string, amount: number) => {
 			const price = prices[symbol.toUpperCase()]?.usd || 0;
 			return price * amount;
@@ -126,7 +220,7 @@ export function useTokenPrices(symbols: string[]) {
  * Hook to get a single token price
  */
 export function useTokenPrice(symbol: string) {
-	const { prices, loading, error, getPrice } = useTokenPrices([symbol]);
+	const { loading, error, getPrice } = useTokenPrices([symbol]);
 	
 	return {
 		price: getPrice(symbol),

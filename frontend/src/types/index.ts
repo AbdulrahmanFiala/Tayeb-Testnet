@@ -46,6 +46,7 @@ export interface SwapState {
 export interface TokenPrice {
 	symbol: string;
 	usd: number;
+	marketCap?: number;
 	lastUpdated: number;
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { CryptoTokenIcon } from "../components/CryptoTokenIcon";
 import { useShariaCompliance } from "../hooks/useShariaCompliance";
 import { useWallet } from "../hooks/useWallet";
+import { useTokenPrices } from "../hooks/useTokenPrices";
 
 interface ShariaCoin {
 	id: string;
@@ -21,7 +22,7 @@ export function TokensPage() {
 	const { coins, coinsLoading } = useShariaCompliance();
 
 	const [searchTerm, setSearchTerm] = useState("");
-	const [sortBy, setSortBy] = useState<"name" | "price" | "change">("name");
+	const [sortBy, setSortBy] = useState<"name" | "price" | "marketcap">("name");
 
 	// Convert coins to ShariaCoin format for display
 	const contractTokens: ShariaCoin[] = useMemo(
@@ -38,23 +39,29 @@ export function TokensPage() {
 		[coins]
 	);
 
-	// Mock price data - memoized to prevent re-renders
+	// Get all token symbols for price fetching
+	const tokenSymbols = useMemo(
+		() => contractTokens.map((token) => token.symbol),
+		[contractTokens]
+	);
+
+	// Fetch real prices from CoinGecko
+	const { prices } = useTokenPrices(tokenSymbols);
+
+	// Format price data for display - memoized to prevent re-renders
 	const priceData = useMemo(
-		() =>
-			({
-				BTC: { price: 42500.0, change: 2.5 },
-				ETH: { price: 2350.0, change: 1.8 },
-				USDT: { price: 1.0, change: 0.1 },
-				XRP: { price: 0.54, change: -1.2 },
-				BNB: { price: 612.0, change: 3.2 },
-				SOL: { price: 142.0, change: 4.1 },
-				USDC: { price: 1.0, change: 0.0 },
-				TRX: { price: 0.082, change: -0.5 },
-				ADA: { price: 0.98, change: 2.1 },
-				LINK: { price: 18.5, change: 5.3 },
-				HBAR: { price: 0.12, change: 1.9 },
-			} as Record<string, { price: number; change: number }>),
-		[]
+		() => {
+			const data: Record<string, { price: number; marketCap: number }> = {};
+			for (const token of contractTokens) {
+				const priceInfo = prices[token.symbol.toUpperCase()];
+				data[token.symbol] = {
+					price: priceInfo?.usd || 0,
+					marketCap: priceInfo?.marketCap || 0,
+				};
+			}
+			return data;
+		},
+		[contractTokens, prices]
 	);
 
 	const filteredAndSortedTokens = useMemo(() => {
@@ -67,14 +74,14 @@ export function TokensPage() {
 		filtered.sort((a: ShariaCoin, b: ShariaCoin) => {
 			const priceA = priceData[a.symbol]?.price || 0;
 			const priceB = priceData[b.symbol]?.price || 0;
-			const changeA = priceData[a.symbol]?.change || 0;
-			const changeB = priceData[b.symbol]?.change || 0;
+			const marketCapA = priceData[a.symbol]?.marketCap || 0;
+			const marketCapB = priceData[b.symbol]?.marketCap || 0;
 
 			switch (sortBy) {
 				case "price":
 					return priceB - priceA;
-				case "change":
-					return changeB - changeA;
+				case "marketcap":
+					return marketCapB - marketCapA;
 				case "name":
 				default:
 					return a.symbol.localeCompare(b.symbol);
@@ -153,17 +160,17 @@ export function TokensPage() {
 						</div>
 					</button>
 					<button
-						onClick={() => setSortBy("change")}
+						onClick={() => setSortBy("marketcap")}
 						className={`flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-xl px-4 transition-colors ${
-							sortBy === "change"
+							sortBy === "marketcap"
 								? "bg-primary text-background-dark"
 								: "bg-[#23483c] text-white"
 						}`}
 					>
-						<p className='text-sm font-medium leading-normal'>Sort by Change</p>
+						<p className='text-sm font-medium leading-normal'>Sort by Market Cap</p>
 						<div
 							className={
-								sortBy === "change" ? "text-background-dark" : "text-white"
+								sortBy === "marketcap" ? "text-background-dark" : "text-white"
 							}
 						>
 							<span className='material-symbols-outlined text-base'>
@@ -215,7 +222,7 @@ export function TokensPage() {
 												Price
 											</th>
 											<th className='px-4 py-3 text-left text-white text-sm font-medium leading-normal'>
-												24h Change
+												Market Cap
 											</th>
 											<th className='px-4 py-3 text-left text-white text-sm font-medium leading-normal'>
 												Compliance
@@ -231,7 +238,6 @@ export function TokensPage() {
 									<tbody>
 										{filteredAndSortedTokens.map((token, index) => {
 											const priceInfo = priceData[token.symbol];
-											const isPositive = (priceInfo?.change || 0) >= 0;
 
 											return (
 												<tr
@@ -264,13 +270,16 @@ export function TokensPage() {
 													<td className='h-[72px] px-4 py-2 text-[#92c9b7] text-sm font-normal leading-normal'>
 														${priceInfo?.price.toFixed(2) || "0.00"}
 													</td>
-													<td
-														className={`h-[72px] px-4 py-2 text-sm font-normal leading-normal ${
-															isPositive ? "text-green-500" : "text-red-500"
-														}`}
-													>
-														{isPositive ? "+" : ""}
-														{priceInfo?.change.toFixed(1) || "0.0"}%
+													<td className='h-[72px] px-4 py-2 text-[#92c9b7] text-sm font-normal leading-normal'>
+														{priceInfo?.marketCap 
+															? priceInfo.marketCap >= 1e12
+																? `$${(priceInfo.marketCap / 1e12).toFixed(2)}T`
+																: priceInfo.marketCap >= 1e9
+																? `$${(priceInfo.marketCap / 1e9).toFixed(2)}B`
+																: priceInfo.marketCap >= 1e6
+																? `$${(priceInfo.marketCap / 1e6).toFixed(2)}M`
+																: `$${priceInfo.marketCap.toFixed(0)}`
+															: "—"}
 													</td>
 													<td className='h-[72px] px-4 py-2 text-sm font-normal leading-normal'>
 														{token.verified && (
@@ -310,7 +319,6 @@ export function TokensPage() {
 						<div className='sm:hidden grid grid-cols-1 gap-4'>
 							{filteredAndSortedTokens.map((token) => {
 								const priceInfo = priceData[token.symbol];
-								const isPositive = (priceInfo?.change || 0) >= 0;
 
 								return (
 									<div
@@ -344,15 +352,18 @@ export function TokensPage() {
 													${priceInfo?.price.toFixed(2) || "0.00"}
 												</p>
 											</div>
-											<div
-												className={`text-right ${
-													isPositive ? "text-green-500" : "text-red-500"
-												}`}
-											>
-												<p className='text-sm'>24h Change</p>
-												<p className='text-lg font-bold'>
-													{isPositive ? "+" : ""}
-													{priceInfo?.change.toFixed(1) || "0.0"}%
+											<div>
+												<p className='text-[#92c9b7] text-sm text-right'>Market Cap</p>
+												<p className='text-white text-lg font-bold text-right'>
+													{priceInfo?.marketCap 
+														? priceInfo.marketCap >= 1e12
+															? `$${(priceInfo.marketCap / 1e12).toFixed(2)}T`
+															: priceInfo.marketCap >= 1e9
+															? `$${(priceInfo.marketCap / 1e9).toFixed(2)}B`
+															: priceInfo.marketCap >= 1e6
+															? `$${(priceInfo.marketCap / 1e6).toFixed(2)}M`
+															: `$${priceInfo.marketCap.toFixed(0)}`
+														: "—"}
 												</p>
 											</div>
 										</div>
