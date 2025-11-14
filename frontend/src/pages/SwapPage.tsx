@@ -13,6 +13,7 @@ import { useTokenBalance } from "../hooks/useTokenBalance";
 import { useWallet } from "../hooks/useWallet";
 import type { Token, TransactionNotification, SwapConfirmationData } from "../types";
 import { ERC20_ABI } from "../config/abis";
+import { CONTRACTS } from "../config/contracts";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 export function SwapPage() {
@@ -22,6 +23,7 @@ export function SwapPage() {
 	const {
 		approveToken,
 		swapTokenForToken,
+		swapGLMRForToken,
 		isSwapping,
 		isConfirming,
 		isConfirmed,
@@ -206,6 +208,15 @@ export function SwapPage() {
 			return;
 		}
 
+		// Native DEV doesn't need approval - skip check
+		const isNativeDEV = tokenIn.symbol === "DEV" && 
+			tokenIn.addresses.moonbase?.toLowerCase() === CONTRACTS.WETH.toLowerCase();
+		
+		if (isNativeDEV) {
+			setNeedsApproval(false);
+			return;
+		}
+
 		try {
 			setCheckingAllowance(true);
 			const amountInWei = parseUnits(amountIn, tokenIn.decimals);
@@ -361,12 +372,26 @@ export function SwapPage() {
 			const minAmountOut =
 				(amountOutWei * BigInt(100 - slippagePercentInt)) / 100n;
 
-			await swapTokenForToken(
-				tokenIn.addresses.moonbase as `0x${string}`,
-				tokenOut.addresses.moonbase as `0x${string}`,
-				amountInWei,
-				minAmountOut
-			);
+			// Check if swapping native DEV - use swapGLMRForToken instead
+			const isNativeDEV = tokenIn.symbol === "DEV" && 
+				tokenIn.addresses.moonbase?.toLowerCase() === CONTRACTS.WETH.toLowerCase();
+
+			if (isNativeDEV) {
+				// Use native DEV swap function (no approval needed)
+				await swapGLMRForToken(
+					tokenOut.addresses.moonbase as `0x${string}`,
+					minAmountOut,
+					amountInWei
+				);
+			} else {
+				// Use regular token swap (requires approval)
+				await swapTokenForToken(
+					tokenIn.addresses.moonbase as `0x${string}`,
+					tokenOut.addresses.moonbase as `0x${string}`,
+					amountInWei,
+					minAmountOut
+				);
+			}
 		} catch (err) {
 			const friendlyMessage = getFriendlyErrorMessage(err);
 			setError(friendlyMessage);

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type { Token } from "../types";
 import { CryptoTokenIcon } from "./CryptoTokenIcon";
 
@@ -16,6 +16,7 @@ export function TokenSelector({
 	disabled = false,
 }: TokenSelectorProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
 	const dropdownRef = useRef<HTMLDivElement>(null);
 
 	// Close dropdown when clicking outside
@@ -26,6 +27,7 @@ export function TokenSelector({
 				!dropdownRef.current.contains(event.target as Node)
 			) {
 				setIsOpen(false);
+				setSearchQuery(""); // Clear search when closing
 			}
 		};
 
@@ -35,9 +37,23 @@ export function TokenSelector({
 		};
 	}, []);
 
+	// Filter tokens based on search query
+	const filteredTokens = useMemo(() => {
+		if (!searchQuery.trim()) {
+			return tokens;
+		}
+		const query = searchQuery.toLowerCase().trim();
+		return tokens.filter(
+			(token) =>
+				token.symbol.toLowerCase().includes(query) ||
+				token.name.toLowerCase().includes(query)
+		);
+	}, [tokens, searchQuery]);
+
 	const handleTokenSelect = (token: Token) => {
 		onTokenChange(token);
 		setIsOpen(false);
+		setSearchQuery(""); // Clear search after selection
 	};
 
 	return (
@@ -82,8 +98,25 @@ export function TokenSelector({
 						<div className="text-white/60 text-xs uppercase font-medium px-3 py-2">
 							Select Token
 						</div>
+						{/* Search Input */}
+						<div className="px-3 pb-2">
+							<div className="relative">
+								<input
+									type="text"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									placeholder="Search tokens..."
+									className="w-full bg-[#23483c] border border-[#2c5a4b] rounded-lg px-3 py-2 pl-9 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+									autoFocus
+								/>
+								<span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">
+									search
+								</span>
+							</div>
+						</div>
 						<div className="max-h-64 overflow-y-auto">
-							{tokens.map((token) => (
+							{filteredTokens.length > 0 ? (
+								filteredTokens.map((token) => (
 								<button
 									key={token.addresses.moonbase}
 									type="button"
@@ -122,7 +155,12 @@ export function TokenSelector({
 										</svg>
 									)}
 								</button>
-							))}
+								))
+							) : (
+								<div className="px-3 py-8 text-center text-white/40 text-sm">
+									No tokens found
+								</div>
+							)}
 						</div>
 					</div>
 				</div>

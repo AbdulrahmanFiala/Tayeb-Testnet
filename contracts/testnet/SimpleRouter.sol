@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IDEXRouter.sol";
+import "../interfaces/IWETH.sol";
 import "./SimplePair.sol";
 import "./SimpleFactory.sol";
 
@@ -107,6 +108,28 @@ contract SimpleRouter is IDEXRouter, ReentrancyGuard {
         address to,
         uint256 deadline
     ) external ensure(deadline) nonReentrant returns (uint256 amountA, uint256 amountB) {
+        return _removeLiquidity(tokenA, tokenB, liquidity, amountAMin, amountBMin, to);
+    }
+
+    /**
+     * @notice Internal function to remove liquidity from a pair
+     * @param tokenA First token address
+     * @param tokenB Second token address
+     * @param liquidity Amount of LP tokens to burn
+     * @param amountAMin Minimum amount of tokenA to receive
+     * @param amountBMin Minimum amount of tokenB to receive
+     * @param to Recipient address
+     * @return amountA Amount of tokenA received
+     * @return amountB Amount of tokenB received
+     */
+    function _removeLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 liquidity,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to
+    ) internal returns (uint256 amountA, uint256 amountB) {
         address pair = _pairFor(tokenA, tokenB);
         IERC20(pair).safeTransferFrom(msg.sender, pair, liquidity);
         (uint256 amount0, uint256 amount1) = SimplePair(pair).burn(to);
@@ -114,6 +137,79 @@ contract SimpleRouter is IDEXRouter, ReentrancyGuard {
         (amountA, amountB) = tokenA == token0 ? (amount0, amount1) : (amount1, amount0);
         if (amountA < amountAMin) revert InsufficientAmount();
         if (amountB < amountBMin) revert InsufficientAmount();
+    }
+
+    /**
+     * @notice Add liquidity with native token (DEV)
+     * @param token Token address to pair with native token
+     * @param amountTokenDesired Desired amount of token
+     * @param amountTokenMin Minimum amount of token
+     * @param amountETHMin Minimum amount of native token
+     * @param to Recipient address
+     * @param deadline Transaction deadline
+     * @return amountToken Actual amount of token added
+     * @return amountETH Actual amount of native token added
+     * @return liquidity LP tokens minted
+     */
+    function addLiquidityETH(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256 deadline
+    ) external payable ensure(deadline) nonReentrant returns (uint256 amountToken, uint256 amountETH, uint256 liquidity) {
+        (amountToken, amountETH) = _addLiquidity(
+            token,
+            WETH,
+            amountTokenDesired,
+            msg.value,
+            amountTokenMin,
+            amountETHMin
+        );
+        address pair = _pairFor(token, WETH);
+        IERC20(token).safeTransferFrom(msg.sender, pair, amountToken);
+        IWETH(WETH).deposit{value: amountETH}();
+        assert(IWETH(WETH).transfer(pair, amountETH));
+        liquidity = SimplePair(pair).mint(to);
+        // refund dust ETH, if any
+        if (msg.value > amountETH) {
+            (bool success,) = payable(msg.sender).call{value: msg.value - amountETH}("");
+            require(success, "ETH refund failed");
+        }
+    }
+
+    /**
+     * @notice Remove liquidity with native token (DEV)
+     * @param token Token address paired with native token
+     * @param liquidity Amount of LP tokens to burn
+     * @param amountTokenMin Minimum amount of token to receive
+     * @param amountETHMin Minimum amount of native token to receive
+     * @param to Recipient address
+     * @param deadline Transaction deadline
+     * @return amountToken Amount of token received
+     * @return amountETH Amount of native token received
+     */
+    function removeLiquidityETH(
+        address token,
+        uint256 liquidity,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256 deadline
+    ) external ensure(deadline) nonReentrant returns (uint256 amountToken, uint256 amountETH) {
+        (amountToken, amountETH) = _removeLiquidity(
+            token,
+            WETH,
+            liquidity,
+            amountTokenMin,
+            amountETHMin,
+            address(this)
+        );
+        IERC20(token).safeTransfer(to, amountToken);
+        IWETH(WETH).withdraw(amountETH);
+        (bool success,) = payable(to).call{value: amountETH}("");
+        require(success, "ETH transfer failed");
     }
 
     // ============================================================================
@@ -162,6 +258,54 @@ contract SimpleRouter is IDEXRouter, ReentrancyGuard {
         if (amounts[0] > amountInMax) revert ExcessiveInputAmount();
         IERC20(path[0]).safeTransferFrom(msg.sender, _pairFor(path[0], path[1]), amounts[0]);
         _swap(amounts, path, to);
+    }
+
+    /**
+     * @notice Swap exact native tokens (DEV) for tokens
+     * @param amountOutMin Minimum output amount
+     * @param path Array of token addresses (first must be WETH)
+     * @param to Recipient address
+     * @param deadline Transaction deadline
+     * @return amounts Array of amounts for each swap
+     */
+    function swapExactETHForTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external payable ensure(deadline) nonReentrant returns (uint256[] memory amounts) {
+        if (path[0] != WETH) revert InvalidPath();
+        amounts = getAmountsOut(msg.value, path);
+        if (amounts[amounts.length - 1] < amountOutMin) revert InsufficientAmount();
+        IWETH(WETH).deposit{value: amounts[0]}();
+        assert(IWETH(WETH).transfer(_pairFor(path[0], path[1]), amounts[0]));
+        _swap(amounts, path, to);
+    }
+
+    /**
+     * @notice Swap tokens for exact native tokens (DEV)
+     * @param amountOut Exact output amount in native tokens
+     * @param amountInMax Maximum input amount
+     * @param path Array of token addresses (last must be WETH)
+     * @param to Recipient address
+     * @param deadline Transaction deadline
+     * @return amounts Array of amounts for each swap
+     */
+    function swapTokensForExactETH(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external ensure(deadline) nonReentrant returns (uint256[] memory amounts) {
+        if (path[path.length - 1] != WETH) revert InvalidPath();
+        amounts = getAmountsIn(amountOut, path);
+        if (amounts[0] > amountInMax) revert ExcessiveInputAmount();
+        IERC20(path[0]).safeTransferFrom(msg.sender, _pairFor(path[0], path[1]), amounts[0]);
+        _swap(amounts, path, address(this));
+        IWETH(WETH).withdraw(amounts[amounts.length - 1]);
+        (bool success,) = payable(to).call{value: amounts[amounts.length - 1]}("");
+        require(success, "ETH transfer failed");
     }
 
     // ============================================================================

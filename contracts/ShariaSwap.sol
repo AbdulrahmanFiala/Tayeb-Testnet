@@ -229,26 +229,20 @@ contract ShariaSwap is Ownable, ReentrancyGuard {
         
         shariaCompliance.requireShariaCompliant(tokenOutSymbol);
 
-        // Wrap DEV to WETH
-        (bool success, ) = WETH.call{value: msg.value}("");
-        if (!success) revert SwapFailed();
-
-        // Approve router
-        IERC20(WETH).forceApprove(address(dexRouter), msg.value);
-
         // Build swap path (auto-routes through USDC if no direct pair)
+        // Path must start with WETH for native token swaps
         address[] memory path = _buildSwapPath(WETH, tokenOut);
 
-        // Pre-validate quote to catch tiny inputs before wrapping
+        // Pre-validate quote to catch tiny inputs
         uint256 expectedAmountOut = _validateQuote(WETH, tokenOut, msg.value, path);
         if (expectedAmountOut < minAmountOut) {
             revert SlippageExceeded();
         }
 
-        // Execute swap
+        // Execute swap using router's native token swap function
+        // Router handles wrapping DEV to WETH internally
         uint256[] memory amounts;
-        try dexRouter.swapExactTokensForTokens(
-            msg.value,
+        try dexRouter.swapExactETHForTokens(
             minAmountOut,
             path,
             msg.sender,

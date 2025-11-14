@@ -1,10 +1,10 @@
 {
   "network": "moonbase",
   "version": "1.0.0",
-  "lastDeployed": "2025-11-14T19:53:54.386Z",
+  "lastDeployed": "2025-11-14T20:52:19.621Z",
   "amm": {
     "factory": "0xd6Ff884A3120dEeDd1ce8ca5e192e7bd121E807d",
-    "router": "0x0cefcBC9FCDE8feA9462d7cAba8B259a6445Feeb",
+    "router": "0xC9280D639E87091d7C802918b1726424C9212D03",
     "weth": "0xD909178CC99d318e4D46e7E66a972955859670E1"
   },
   "main": {
