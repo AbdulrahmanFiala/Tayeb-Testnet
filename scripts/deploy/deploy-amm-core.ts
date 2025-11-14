@@ -71,7 +71,6 @@ async function main() {
     },
     metadata: {
       ...existingPairsConfig.metadata,
-      deploymentDate: new Date().toISOString(),
       deployer: deployer.address,
     },
   };

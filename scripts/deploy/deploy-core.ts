@@ -136,7 +136,6 @@ async function main() {
     },
     metadata: {
       ...contractsConfig.metadata,
-      deploymentDate: new Date().toISOString(),
       deployer: deployer.address,
     },
   };

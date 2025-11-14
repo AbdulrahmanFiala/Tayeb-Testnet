@@ -197,17 +197,56 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Calculate initial execution time for new orders
+     * @dev If within ~5 minutes of boundary, cron job likely already ran, so skip to next hour.
+     * @param currentTime Current block timestamp
+     * @return Initial execution time rounded to hour boundary minus blocks
+     */
+    function _calculateInitialExecutionTime(uint256 currentTime) internal view returns (uint256) {
+        // Calculate what the rounded time would be
+        uint256 roundedTime = _roundToNextHourMinusBlocks(currentTime);
+        
+        // Check if we're within ~5 minutes (300 seconds) of the rounded time
+        // If so, the cron job has likely already executed for this hour, so skip to next hour
+        uint256 timeDiff = currentTime >= roundedTime ? currentTime - roundedTime : roundedTime - currentTime;
+        uint256 fiveMinutes = 300; // 5 minutes in seconds
+        
+        if (timeDiff <= fiveMinutes) {
+            // Within 5 minutes of boundary, cron job likely already ran - skip to next hour
+            return roundedTime + HOUR_IN_SECONDS;
+        } else {
+            // Not close to boundary, use normal rounding
+            return roundedTime;
+        }
+    }
+
+    /**
      * @notice Calculate next execution time for subsequent executions
-     * @dev For hourly: round to next hour. For daily/weekly: add interval then round
+     * @dev If already at hour boundary, just add interval. Otherwise round to next hour first.
      * @param currentTime Current block timestamp
      * @param interval Order interval in seconds
      * @return Next execution time rounded to hour boundary minus blocks
      */
     function _calculateNextExecutionTime(uint256 currentTime, uint256 interval) internal view returns (uint256) {
-        // Add interval first (for daily/weekly orders)
-        uint256 nextExecution = currentTime + interval;
-        // Then round to next hour minus blocks
-        return _roundToNextHourMinusBlocks(nextExecution);
+        // Calculate what the rounded time would be
+        uint256 roundedTime = _roundToNextHourMinusBlocks(currentTime);
+        
+        // Check if we're already at an hour boundary (within 5 minutes)
+        // If so, just add interval directly - no rounding needed
+        uint256 timeDiff = currentTime >= roundedTime ? currentTime - roundedTime : roundedTime - currentTime;
+        uint256 fiveMinutes = 300; // 5 minutes in seconds
+        
+        if (timeDiff <= fiveMinutes) {
+            // Already at hour boundary, just add interval directly
+            return currentTime + interval;
+        } else {
+            // Not at boundary, round to next hour first
+            if (interval == HOUR_IN_SECONDS) {
+                return roundedTime;
+            } else {
+                return roundedTime + interval;
+            }
+        }
     }
 
     // ============================================================================
@@ -259,8 +298,8 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
         order.interval = intervalSeconds;
         order.intervalsCompleted = 0;
         order.totalIntervals = totalIntervals;
-        // Round to next hour boundary minus blocks (configurable) for cron job alignment
-        order.nextExecutionTime = _roundToNextHourMinusBlocks(block.timestamp);
+        // Calculate initial execution time (skips to next hour if within 5 minutes of boundary)
+        order.nextExecutionTime = _calculateInitialExecutionTime(block.timestamp);
         order.startTime = block.timestamp;
         order.isActive = true;
         order.exists = true;
@@ -340,8 +379,8 @@ contract ShariaDCA is Ownable, ReentrancyGuard {
         order.interval = intervalSeconds;
         order.intervalsCompleted = 0;
         order.totalIntervals = totalIntervals;
-        // Round to next hour boundary minus blocks (configurable) for cron job alignment
-        order.nextExecutionTime = _roundToNextHourMinusBlocks(block.timestamp);
+        // Calculate initial execution time (skips to next hour if within 5 minutes of boundary)
+        order.nextExecutionTime = _calculateInitialExecutionTime(block.timestamp);
         order.startTime = block.timestamp;
         order.isActive = true;
         order.exists = true;

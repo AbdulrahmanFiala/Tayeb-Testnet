@@ -70,7 +70,6 @@ export interface DeployedMain {
 }
 
 export interface DeploymentMetadata {
-  deploymentDate: string | null;
   deployer: string | null;
 }
 

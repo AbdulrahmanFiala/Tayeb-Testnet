@@ -104,7 +104,6 @@ async function main() {
         currentConfig.lastDeployed = new Date().toISOString();
         currentConfig.metadata = {
           ...currentConfig.metadata,
-          deploymentDate: new Date().toISOString(),
           deployer: deployer.address,
         };
         
@@ -144,7 +143,6 @@ async function main() {
   // Only update metadata (addresses should already be saved incrementally)
   currentConfig.metadata = {
     ...currentConfig.metadata,
-    deploymentDate: new Date().toISOString(),
     deployer: deployer.address,
   };
   currentConfig.lastDeployed = new Date().toISOString();
