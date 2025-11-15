@@ -1,11 +1,11 @@
 import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
-import halaCoinsConfig from "../../config/halaCoins.json";
+import tayebCoinsConfig from "../../config/tayebCoins.json";
 import deployedContractsConfig from "../../config/deployedContracts.json";
-import { HalaCoinsConfig, getNonStablecoins, getCoinBySymbol, DeployedContracts } from "../../config/types";
+import { TayebCoinsConfig, getNonStablecoins, getCoinBySymbol, DeployedContracts } from "../../config/types";
 
 /**
- * Add liquidity to AMM pairs for all Initial Hala Coins
+ * Add liquidity to AMM pairs for all Initial Tayeb Coins
  * Usage: npx hardhat run scripts/liquidity/addLiquidity.ts --network moonbase
  * 
  * Reads addresses from config JSON files
@@ -13,7 +13,7 @@ import { HalaCoinsConfig, getNonStablecoins, getCoinBySymbol, DeployedContracts 
  */
 async function main() {
   dotenv.config();
-  const config = halaCoinsConfig as HalaCoinsConfig;
+  const config = tayebCoinsConfig as TayebCoinsConfig;
   const contractsConfig = deployedContractsConfig as DeployedContracts;
 
   const [deployer] = await ethers.getSigners();
@@ -37,7 +37,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Get non-stablecoin Hala Coins from config
+  // Get non-stablecoin Tayeb Coins from config
   const nonStablecoins = getNonStablecoins(config);
   const USDT_COIN = config.coins.find(c => c.symbol === "USDT");
   const USDT_ADDRESS = USDT_COIN?.addresses.moonbase;
@@ -208,7 +208,7 @@ async function main() {
     console.log(`⏭️  USDC already approved (${ethers.formatUnits(usdcAllowance, 6)})`);
   }
 
-  // Approve each Hala Coin (check existing approvals first to avoid unnecessary transactions)
+  // Approve each Tayeb Coin (check existing approvals first to avoid unnecessary transactions)
   const tokenApprovals: { [key: string]: bigint } = {};
   for (const coin of nonStablecoins) {
     const tokenAddress = coin.addresses.moonbase;
@@ -483,7 +483,7 @@ async function main() {
     console.log(`❌ Failed: ${failCount} pairs`);
   }
   console.log();
-  console.log("💡 All Initial Hala Coins now have liquidity pools with USDC");
+  console.log("💡 All Initial Tayeb Coins now have liquidity pools with USDC");
   console.log("💡 You can now test swaps through the ShariaSwap contract");
 }
 

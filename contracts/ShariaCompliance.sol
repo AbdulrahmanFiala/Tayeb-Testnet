@@ -275,7 +275,7 @@ contract ShariaCompliance is Ownable {
      * This function is kept empty - all coins are registered via registerShariaCoin() in deployment script
      */
     function _initializeDefaultCoins() private {
-        // All Initial Hala Coins are registered programmatically from config
+        // All Initial Tayeb Coins are registered programmatically from config
         // See scripts/deploy-core.ts for registration logic
     }
 

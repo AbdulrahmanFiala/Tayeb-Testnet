@@ -5,7 +5,7 @@
 
 import type { Address } from "viem";
 import deployedContracts from "../../../config/deployedContracts.json";
-import halaCoinsData from "../../../config/halaCoins.json";
+import tayebCoinsData from "../../../config/tayebCoins.json";
 
 // Type-safe contract addresses
 export const CONTRACTS = {
@@ -35,7 +35,7 @@ export const NETWORK_INFO = {
 } as const;
 
 // Token Metadata
-export const TOKEN_METADATA = halaCoinsData.coins.reduce(
+export const TOKEN_METADATA = tayebCoinsData.coins.reduce(
 	(acc, coin) => {
 		acc[coin.symbol] = {
 			symbol: coin.symbol,

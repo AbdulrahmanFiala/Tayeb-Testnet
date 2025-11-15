@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
-import halaCoinsConfig from "../../config/halaCoins.json";
-import { HalaCoinsConfig } from "../../config/types";
+import tayebCoinsConfig from "../../config/tayebCoins.json";
+import { TayebCoinsConfig } from "../../config/types";
 
 /**
  * Mint Initial Tokens
@@ -14,13 +14,13 @@ import { HalaCoinsConfig } from "../../config/types";
  */
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const config = halaCoinsConfig as HalaCoinsConfig;
+  const config = tayebCoinsConfig as TayebCoinsConfig;
 
   console.log("💰 Minting tokens to deployer for liquidity...\n");
   console.log("Account:", deployer.address);
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "DEV\n");
   
-  // Get all deployed token addresses from halaCoins.json
+  // Get all deployed token addresses from tayebCoins.json
   const deployedTokens: { [key: string]: string } = {};
   for (const coin of config.coins) {
     const address = coin.addresses.moonbase;

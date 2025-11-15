@@ -1,12 +1,12 @@
 import { ethers } from "hardhat";
 import deployedContracts from "../../config/deployedContracts.json";
-import halaCoins from "../../config/halaCoins.json";
+import tayebCoins from "../../config/tayebCoins.json";
 
-type CoinConfig = (typeof halaCoins)["coins"][number];
+type CoinConfig = (typeof tayebCoins)["coins"][number];
 
 function getCoinByAddress(address: string): CoinConfig | undefined {
   const lowerAddress = address.toLowerCase();
-  return halaCoins.coins.find(
+  return tayebCoins.coins.find(
     (coin) => coin.addresses.moonbase?.toLowerCase() === lowerAddress
   );
 }

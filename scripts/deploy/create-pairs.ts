@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
-import halaCoinsConfig from "../../config/halaCoins.json";
+import tayebCoinsConfig from "../../config/tayebCoins.json";
 import deployedContractsConfig from "../../config/deployedContracts.json";
-import { HalaCoinsConfig, getNonStablecoins, DeployedContracts } from "../../config/types";
+import { TayebCoinsConfig, getNonStablecoins, DeployedContracts } from "../../config/types";
 import { createOrVerifyPair } from "../utils/deployHelpers";
 
 /**
@@ -18,7 +18,7 @@ import { createOrVerifyPair } from "../utils/deployHelpers";
  */
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const config = halaCoinsConfig as HalaCoinsConfig;
+  const config = tayebCoinsConfig as TayebCoinsConfig;
 
   console.log("🔗 Creating liquidity pairs...\n");
   console.log("Account:", deployer.address);
@@ -36,7 +36,7 @@ async function main() {
 
   const factory = await ethers.getContractAt("SimpleFactory", factoryAddress);
 
-  // Get all deployed token addresses from halaCoins.json
+  // Get all deployed token addresses from tayebCoins.json
   const deployedTokens: { [key: string]: string } = {};
   for (const coin of config.coins) {
     const address = coin.addresses.moonbase;

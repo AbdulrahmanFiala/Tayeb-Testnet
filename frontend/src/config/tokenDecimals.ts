@@ -1,13 +1,13 @@
 // Token decimals configuration
 // Maps token symbols to their decimal places
 
-import halaCoinsData from "../../../config/halaCoins.json";
+import tayebCoinsData from "../../../config/tayebCoins.json";
 
 type TokenDecimalsMap = { [symbol: string]: number };
 
-// Build decimals map from halaCoins.json
+// Build decimals map from tayebCoins.json
 const tokenDecimalsMap: TokenDecimalsMap = {};
-(halaCoinsData as { coins: Array<{ symbol: string; decimals: number }> }).coins.forEach(
+(tayebCoinsData as { coins: Array<{ symbol: string; decimals: number }> }).coins.forEach(
 	(coin) => {
 		tokenDecimalsMap[coin.symbol.toUpperCase()] = coin.decimals;
 	}

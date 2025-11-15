@@ -1,6 +1,6 @@
 # Tayeb - Sharia Compliant DeFi Platform
 
-A comprehensive decentralized platform for Sharia-compliant cryptocurrency investment, built with Solidity smart contracts for Moonbase Alpha (Moonbeam Testnet).
+The first-of-its-kind decentralized platform for Sharia-compliant cryptocurrency investment, built with Solidity smart contracts for Moonbase Alpha (Moonbeam Testnet).
 
 ## 🌟 Features
 
@@ -13,23 +13,30 @@ A comprehensive decentralized platform for Sharia-compliant cryptocurrency inves
 - **Custom AMM**: Built-in Uniswap V2-style AMM for testing
 - **Automatic Routing**: Automatically routes through USDC when direct pairs don't exist
 - **Compliance Enforcement**: Only allows swaps into Sharia-compliant tokens
-- **Swap History**: Track all user swap activities
 - **Price Quotes**: Get swap estimates before execution
-- **Slippage Protection**: Minimum output amount guarantees
 
 ### 3. Dollar Cost Averaging (ShariaDCA)
 - **Automated DCA**: Schedule periodic investments into Sharia-compliant tokens
-- **Local Automation**: Automated execution via local script
-- **Flexible Intervals**: Set custom time intervals (any duration for testing)
+- **Cloud Automation**: Automated execution via cloud deployed script
+- **Flexible Intervals**: Set custom time intervals (day, hour, and week)
 - **Prepaid Deposits**: Lock funds for all future DCA executions
 - **Cancel Anytime**: Get refunds for uncompleted intervals
+
+### 4. Sharia-Compliant Scanner
+- **Wallet Scanning**: Scan any wallet address to check Sharia compliance status
+- **Compliance Identification**: Identifies which tokens are Sharia-compliant and which aren't
+- **Informed Decisions**: Helps users make informed trading decisions based on Sharia principles
 
 ## 🏗️ Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                      Frontend DApp                         │
-│              (React/Next.js + ethers.js)                   │
+│        (React 19 + TypeScript + Vite + Wagmi v2)           │
+│  - Swap Interface                                          │
+│  - DCA Orders Management                                   │
+│  - Token Listing                                           │
+│  - Sharia Scanner                                          │
 └───────────┬────────────────────────────────────┬───────────┘
             │                                    │
 ┌───────────▼──────────┐              ┌──────────▼──────────┐
@@ -39,11 +46,11 @@ A comprehensive decentralized platform for Sharia-compliant cryptocurrency inves
 └──────────────────────┘              └─────────────────────┘
             ▲                                     │
             │                                     │
-┌───────────┴──────────┐                         │
-│     ShariaDCA        │                         │
-│  - Automation Script │                         │
-│  - Scheduled Orders  │                         │
-└──────────────────────┘                         │
+┌───────────┴──────────┐                          │ 
+│     ShariaDCA        │                          │
+│  - Automation Script │                          │
+│  - Scheduled Orders  │                          │
+└──────────────────────┘                          │ 
             │                                     │
             └─────────────┬───────────────────────┘
                           │
@@ -53,169 +60,41 @@ A comprehensive decentralized platform for Sharia-compliant cryptocurrency inves
               └──────────────────────────┘
 ```
 
-## 📦 Smart Contracts
-
-### ShariaCompliance.sol
-Core registry managing Sharia-compliant token approvals. **Contract is source of truth** for coin registrations.
-
-**Key Functions:**
-- `registerShariaCoin(coinId, name, symbol, reason)` - Owner: Add token
-- `removeShariaCoin(coinId)` - Owner: Remove token  
-- `updateComplianceStatus(coinId, verified, reason)` - Owner: Update coin status
-- `isShariaCompliant(coinId)` - Check compliance status
-- `getAllShariaCoins()` - Get all approved tokens
-- `requireShariaCompliant(coinId)` - Validation helper (reverts if not compliant)
-
-**Note:** Coins are registered programmatically from `config/halaCoins.json` during deployment. After deployment, use contract functions to add/remove coins, then sync JSON with `npm run sync:coins`.
-
-### ShariaSwap.sol
-Token swapping with DEX integration and compliance validation.
-
-**Key Functions:**
-- `swapShariaCompliant(tokenIn, tokenOut, amountIn, minAmountOut, deadline)` - Execute swap
-- `swapGLMRForToken(tokenOut, minAmountOut, deadline)` - Swap native DEV
-- `getSwapQuote(tokenIn, tokenOut, amountIn)` - Get price estimate
-- `getUserSwapHistory(user)` - View swap history
-
-**Features:**
-- **Automatic Routing**: Automatically routes swaps through USDC when a direct pair doesn't exist (e.g., ETH → BTC routes through ETH/USDC → BTC/USDC)
-- Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
-
-### ShariaDCA.sol
-Automated Dollar Cost Averaging with local automation script.
-
-**Key Functions:**
-- `createDCAOrderWithDEV(targetToken, amountPerInterval, intervalSeconds, totalIntervals)` - Create order with native DEV
-- `createDCAOrderWithToken(sourceToken, targetToken, amountPerInterval, intervalSeconds, totalIntervals)` - Create order with ERC20 tokens
-- `executeDCAOrder(orderId)` - Execute next interval (called by automation script or manually)
-- `cancelDCAOrder(orderId)` - Cancel and get refund
-- `getDCAOrder(orderId)` - Get order details
-- `getUserOrders(user)` - Get user's orders
-- `checkUpkeep()` / `performUpkeep()` - Automation functions for local script
-
-**Features:**
-- **Any Token → Any Token DCA**: Deposit DEV, USDC, BTC, or any Sharia-compliant token and DCA into any other token
-- **Automatic Routing**: Uses the same routing logic as ShariaSwap (direct pairs or through USDC)
-- Token addresses are automatically queried from `ShariaCompliance` contract. No separate registration needed.
-- **Local Automation**: Run `scripts/automation/auto-execute-dca.ts` to automatically execute orders
-
 ## 🚀 Getting Started
 
-> **Quick Start**: For a step-by-step setup guide, see [SETUP.md](./SETUP.md)
+> **Quick Start**: For a step-by-step setup guide, see [SETUP.md](./docs/SETUP.md)
 
-### Prerequisites
-
-- Node.js 18+ and npm/yarn
-- MetaMask or compatible Web3 wallet
-- DEV tokens on Moonbase Alpha testnet (faucet: https://faucet.moonbeam.network/)
-
-### Quick Setup
-
-```bash
-# Clone and install
-git clone https://github.com/yourusername/Tayeb.git
-cd Tayeb
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env and add your PRIVATE_KEY (see SETUP.md for details)
-
-# Compile, test, and deploy
-npm run compile
-npm test
-npm run deploy:testnet  # Deploys with custom AMM on testnet
-```
-
-### Moonbase Alpha Testnet
-
-This platform is designed for **Moonbase Alpha (testnet)** only:
-
-- ✅ Custom Uniswap V2-style AMM (SimpleRouter, SimplePair, SimpleFactory)
-- ✅ Mock ERC20 tokens (USDT, USDC, DAI) for testing
-- ✅ Manual liquidity provision via `scripts/liquidity/addLiquidity.ts`
-- ✅ Free testnet DEV tokens for testing
-- ✅ No real funds required
-
-For detailed setup instructions, troubleshooting, and post-deployment steps, refer to [SETUP.md](./SETUP.md).
-
-## 🔧 Debugging Tools
-
-### Decode Failed Transactions
-
-Debug failed transactions with the decode script:
-
-```bash
-TX_HASH=0x... npx hardhat run scripts/diagnostics/decode-failed-tx.ts --network moonbase
-```
-
-The script will:
-- Decode function calls and parameters
-- Identify common mistakes (wrong addresses, invalid amounts, etc.)
-- Show revert reasons and error messages
-- Provide troubleshooting guidance
-
-For detailed usage, see [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md#debugging-failed-transactions).
 
 ## 💻 Usage
 
-> **📖 For comprehensive code examples and integration guides, see [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md)**
-
-### Quick Steps
-
-1. **Add Liquidity** (required after deployment):
-   ```bash
-   npx hardhat run scripts/liquidity/addLiquidity.ts --network moonbase
-   ```
-
-2. **Access Deployed Addresses**:
-   - Token addresses: `config/halaCoins.json`
-   - Contract addresses: `config/deployedContracts.json`
-
-3. **Integrate with Your App**:
-   - See [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md) for detailed code examples
-   - Includes: swaps, DCA orders, frontend integration, error handling
-
-For coin management, see [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md#coin-management-workflow).
-
-## 🌐 Moonbeam Network Details
-
-### Moonbase Alpha Testnet
-
-- **Network Name**: Moonbase Alpha
-- **RPC URL**: https://rpc.api.moonbase.moonbeam.network
-- **Chain ID**: 1287
-- **Currency**: DEV
-- **Block Explorer**: https://moonbase.moonscan.io/
-- **Faucet**: https://faucet.moonbeam.network/
-
-### Moonbeam Mainnet
-
-- **Network Name**: Moonbeam
-- **RPC URL**: https://rpc.api.moonbeam.network
-- **Chain ID**: 1284
-- **Currency**: GLMR
-- **Block Explorer**: https://moonscan.io/
-- **API Key**: Get from https://etherscan.io/apidashboard (Etherscan API V2)
-
-### Key Addresses (Moonbase Alpha)
-
-- **WETH (Wrapped DEV)**: `0xD909178CC99d318e4D46e7E66a972955859670E1`
+> **📖 For comprehensive code examples and integration guides, see [USAGE_EXAMPLES.md](./docs/USAGE_EXAMPLES.md)**
 
 
 ## 📚 Resources
 
-- **Usage Examples**: See [USAGE_EXAMPLES.md](./USAGE_EXAMPLES.md) for detailed code examples and integration guides
-- **Setup Guide**: See [SETUP.md](./SETUP.md) for quick start and troubleshooting
-- **Deployment Workflow**: See [DEPLOYMENT_WORKFLOW.md](./DEPLOYMENT_WORKFLOW.md) for deployment details
+- **Usage Examples**: See [USAGE_EXAMPLES.md](./docs/USAGE_EXAMPLES.md) for detailed code examples and integration guides (Wagmi v2 + Viem)
+- **Setup Guide**: See [SETUP.md](./docs/SETUP.md) for quick start and troubleshooting
+- **Testing Guide**: See [TESTING.md](./docs/TESTING.md) for testing instructions
+- **Deployment Workflow**: See [DEPLOYMENT_WORKFLOW.md](./docs/DEPLOYMENT_WORKFLOW.md) for deployment details
 - **Moonbeam Docs**: https://docs.moonbeam.network/
 - **Moonbase Faucet**: https://faucet.moonbeam.network/
 - **Hardhat**: https://hardhat.org/
+- **Wagmi v2**: https://wagmi.sh/
+- **Viem**: https://viem.sh/
 
+### Tech Stack
 
-### Development Workflow
+**Smart Contracts:**
+- Solidity 0.8.20
+- Hardhat
+- TypeScript
+- OpenZeppelin Contracts
 
-For detailed development commands and troubleshooting, see [SETUP.md](./SETUP.md#-development-workflow).
+**Frontend:**
+- React 19
+- TypeScript
+- Vite
+- Wagmi v2
 
 ## 🤝 Contributing
 
@@ -236,14 +115,6 @@ This platform provides tools for Sharia-compliant cryptocurrency investment. How
 - **Do Your Own Research**: Always verify token compliance with qualified Islamic scholars
 - **No Financial Advice**: This is not financial or religious advice
 - **Smart Contract Risk**: Use at your own risk; audit contracts before mainnet use
-- **Testnet First**: Always test on Moonbase Alpha before using mainnet
-
-## 📧 Contact
-
-For questions, issues, or contributions:
-- Open an issue on GitHub
-- Submit a pull request
-- Contact: [your contact info]
 
 ---
 

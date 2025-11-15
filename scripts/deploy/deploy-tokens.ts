@@ -1,15 +1,15 @@
 import { ethers } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
-import halaCoinsConfig from "../../config/halaCoins.json";
+import tayebCoinsConfig from "../../config/tayebCoins.json";
 import deployedContractsConfig from "../../config/deployedContracts.json";
-import { HalaCoinsConfig, DeployedContracts } from "../../config/types";
+import { TayebCoinsConfig, DeployedContracts } from "../../config/types";
 import { deployOrVerifyContract } from "../utils/deployHelpers";
 
 /**
- * Deploy Mock Tokens - Initial Hala Coins
+ * Deploy Mock Tokens - Initial Tayeb Coins
  * 
- * This script deploys MockERC20 tokens for all Initial Hala Coins.
+ * This script deploys MockERC20 tokens for all Initial Tayeb Coins.
  * 
  * Features:
  * - Idempotent: Skips tokens already deployed (checks JSON + on-chain)
@@ -18,9 +18,9 @@ import { deployOrVerifyContract } from "../utils/deployHelpers";
  */
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const config = halaCoinsConfig as HalaCoinsConfig;
+  const config = tayebCoinsConfig as TayebCoinsConfig;
 
-  console.log("📝 Deploying Mock Tokens (Initial Halal Coins)...\n");
+  console.log("📝 Deploying Mock Tokens (Initial Tayeb Coins)...\n");
   console.log("Account:", deployer.address);
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "DEV\n");
   
@@ -54,8 +54,8 @@ async function main() {
     
       // Save address immediately after deployment (incremental save)
       try {
-        // Save to halaCoins.json
-        const configPath = path.join(__dirname, "..", "..", "config", "halaCoins.json");
+        // Save to tayebCoins.json
+        const configPath = path.join(__dirname, "..", "..", "config", "tayebCoins.json");
         const currentConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
         currentConfig.coins = currentConfig.coins.map((c: any) => 
           c.symbol === coin.symbol 
@@ -86,8 +86,8 @@ async function main() {
   // ============================================================================
   console.log("📝 Performing final sync...");
   
-  // Sync halaCoins.json
-  const configPath = path.join(__dirname, "..", "..", "config", "halaCoins.json");
+  // Sync tayebCoins.json
+  const configPath = path.join(__dirname, "..", "..", "config", "tayebCoins.json");
   const currentConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
   currentConfig.metadata = {
     ...currentConfig.metadata,
@@ -102,7 +102,7 @@ async function main() {
   contractsConfig.lastDeployed = new Date().toISOString();
   fs.writeFileSync(contractsPath, JSON.stringify(contractsConfig, null, 2) + "\n");
   
-  console.log("✅ Final sync complete (both halaCoins.json and deployedContracts.json)");
+  console.log("✅ Final sync complete (both tayebCoins.json and deployedContracts.json)");
   console.log();
 
   // ============================================================================
@@ -114,7 +114,7 @@ async function main() {
   console.log("\n📦 Deployed Tokens:", Object.keys(deployedTokens).length);
   console.log("   - New tokens:     ", newCount);
   console.log("   - Already existed:", existingCount);
-  console.log("\n💾 All token addresses saved to halaCoins.json");
+  console.log("\n💾 All token addresses saved to tayebCoins.json");
   console.log("=".repeat(60));
   console.log();
   console.log("💡 Next Steps:");

@@ -93,8 +93,8 @@ export function useWalletTokenScanner(scanAddress?: Address): UseWalletTokenScan
 				throw new Error("Public client not available");
 			}
 
-			// Step 1: Loop through halal coins and check if they're in the wallet
-			console.log("🔍 Checking wallet for halal coins...");
+			// Step 1: Loop through Tayeb coins and check if they're in the wallet
+			console.log("🔍 Checking wallet for Tayeb coins...");
 			console.log(`📊 Found ${coins.length} registered coins to check`);
 
 			const tokens: ScannedToken[] = [];

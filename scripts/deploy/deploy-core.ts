@@ -3,10 +3,10 @@ import hre from "hardhat";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
-import halaCoinsConfig from "../../config/halaCoins.json";
+import tayebCoinsConfig from "../../config/tayebCoins.json";
 import deployedContractsConfig from "../../config/deployedContracts.json";
 import chainConfig from "../../config/chainConfig.json";
-import { HalaCoinsConfig, DeployedContracts } from "../../config/types";
+import { TayebCoinsConfig, DeployedContracts } from "../../config/types";
 import { deployOrVerifyContract } from "../utils/deployHelpers";
 
 /**
@@ -22,7 +22,7 @@ import { deployOrVerifyContract } from "../utils/deployHelpers";
 async function main() {
   // Load environment variables and config
   dotenv.config();
-  const config = halaCoinsConfig as HalaCoinsConfig;
+  const config = tayebCoinsConfig as TayebCoinsConfig;
 
   const [deployer] = await ethers.getSigners();
 
@@ -149,7 +149,7 @@ async function main() {
   // ============================================================================
   console.log("⚙️  Setting up initial configuration...\n");
 
-  console.log("Registering all Initial Hala Coins from config...");
+  console.log("Registering all Initial Tayeb Coins from config...");
   console.log(`📊 Total coins to register: ${config.coins.length}`);
   console.log();
 
