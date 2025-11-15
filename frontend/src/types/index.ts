@@ -11,9 +11,13 @@ export interface Token {
 	avgSlippagePercent?: number;
 }
 
-export interface HalaCoin {
+export interface TayebCoin {
 	coins: Token[];
 }
+
+// Legacy alias for backwards compatibility
+/** @deprecated Use TayebCoin instead */
+export type HalaCoin = TayebCoin;
 
 export interface DeployedContracts {
 	network: string;
@@ -79,4 +83,14 @@ export interface TransactionNotification {
 	amountOut?: string;
 	message?: string;
 	txHash?: string;
+}
+
+export interface SwapRecord {
+	tokenIn: string;
+	tokenOut: string;
+	amountIn: bigint;
+	amountOut: bigint;
+	timestamp: bigint;
+	tokenInSymbol: string;
+	tokenOutSymbol: string;
 }

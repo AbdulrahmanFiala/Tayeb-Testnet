@@ -84,6 +84,29 @@ export const ShariaSwapABI = [
 		outputs: [{ name: "amountOut", type: "uint256" }],
 		stateMutability: "nonpayable",
 	},
+	{
+		type: "function",
+		name: "getUserSwapHistory",
+		inputs: [
+			{ name: "user", type: "address" },
+		],
+		outputs: [
+			{
+				name: "",
+				type: "tuple[]",
+				components: [
+					{ name: "tokenIn", type: "address" },
+					{ name: "tokenOut", type: "address" },
+					{ name: "amountIn", type: "uint256" },
+					{ name: "amountOut", type: "uint256" },
+					{ name: "timestamp", type: "uint256" },
+					{ name: "tokenInSymbol", type: "string" },
+					{ name: "tokenOutSymbol", type: "string" },
+				],
+			},
+		],
+		stateMutability: "view",
+	},
 ] as const;
 
 export const ShariaComplianceABI = [

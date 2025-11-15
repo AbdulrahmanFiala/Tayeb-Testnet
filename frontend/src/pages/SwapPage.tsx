@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { formatUnits, parseUnits } from "viem";
 import { usePublicClient, useReadContract } from "wagmi";
-import halaCoinsData from "../../../config/halaCoins.json";
+import { FaTimes } from "react-icons/fa";
+import tayebCoinsData from "../../../config/tayebCoins.json";
 import { TokenInput } from "../components/TokenInput";
 import { SwapConfirmationModal } from "../components/SwapConfirmationModal";
 import { TransactionNotificationList } from "../components/TransactionNotification";
@@ -14,7 +15,7 @@ import { useWallet } from "../hooks/useWallet";
 import type { Token, TransactionNotification, SwapConfirmationData } from "../types";
 import { ERC20_ABI } from "../config/abis";
 import { CONTRACTS } from "../config/contracts";
-import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { getFriendlyErrorMessage, isUserRejection } from "../utils/errorMessages";
 
 export function SwapPage() {
 	const [searchParams] = useSearchParams();
@@ -118,11 +119,11 @@ export function SwapPage() {
 
 
 
-	// Format tokens: merge smart contract data with halaCoins.json metadata
+	// Format tokens: merge smart contract data with tayebCoins.json metadata
 	const tokens: Token[] = (coins || []).map((coin) => {
-		// Find matching coin metadata from halaCoins.json
-		const halaCoins = (
-			halaCoinsData as {
+		// Find matching coin metadata from tayebCoins.json
+		const tayebCoins = (
+			tayebCoinsData as {
 				coins: Array<{
 					symbol: string;
 					decimals: number;
@@ -130,7 +131,7 @@ export function SwapPage() {
 				}>;
 			}
 		).coins;
-		const coinMetadata = halaCoins.find(
+		const coinMetadata = tayebCoins.find(
 			(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
 				c.symbol.toLowerCase() === coin.symbol.toLowerCase()
 		);
@@ -138,13 +139,13 @@ export function SwapPage() {
 		return {
 			symbol: coin.symbol,
 			name: coin.name,
-			// Use decimals from halaCoins.json; default to 18
+			// Use decimals from tayebCoins.json; default to 18
 			decimals: coinMetadata?.decimals ?? 18,
 			description: coin.complianceReason,
 			complianceReason: coin.complianceReason,
 			addresses: { moonbase: coin.tokenAddress },
 			permissible: coin.verified,
-			// Include avgSlippagePercent from halaCoins.json
+			// Include avgSlippagePercent from tayebCoins.json
 			avgSlippagePercent: coinMetadata?.avgSlippagePercent,
 		};
 	});
@@ -475,23 +476,43 @@ export function SwapPage() {
 
 			console.log("✅ Approval transaction sent");
 		} catch (err) {
-			const friendlyMessage = getFriendlyErrorMessage(err);
-			setError(friendlyMessage);
 			console.error("Approval error:", err);
 			
-			// Update notification to error if it exists
-			if (currentTxId) {
-				setNotifications((prev) =>
-					prev.map((n) =>
-						n.id === currentTxId
-							? { ...n, status: "error", message: friendlyMessage }
-							: n
-					)
-				);
+			// Check if user rejected the transaction
+			const isRejection = isUserRejection(err);
+			
+			if (isRejection) {
+				// User declined - show friendly message and reset state
+				setError("Transaction was declined. The approval was cancelled.");
+				setIsApprovingToken(false);
+				// Clear notification if it exists
+				if (currentTxId) {
+					setNotifications((prev) =>
+						prev.filter((n) => n.id !== currentTxId)
+					);
+				}
+				setCurrentTxId(null);
+				// Reset the swap hook to clear its error state
+				resetSwap();
+			} else {
+				// Real error - show error message
+				const friendlyMessage = getFriendlyErrorMessage(err);
+				setError(friendlyMessage);
+				
+				// Update notification to error if it exists
+				if (currentTxId) {
+					setNotifications((prev) =>
+						prev.map((n) =>
+							n.id === currentTxId
+								? { ...n, status: "error", message: friendlyMessage }
+								: n
+						)
+					);
+				}
+				// Clear currentTxId on error so user can try again
+				setCurrentTxId(null);
+				setIsApprovingToken(false);
 			}
-			// Clear currentTxId on error so user can try again
-			setCurrentTxId(null);
-			setIsApprovingToken(false);
 		}
 	};
 
@@ -560,11 +581,24 @@ export function SwapPage() {
 		if (txHash && currentTxId) {
 			console.log("📝 Transaction hash available (wallet confirmed):", txHash);
 			
-			// Check if notification already exists (shouldn't, but just in case)
-			const existingNotification = notifications.find(n => n.id === currentTxId);
-			
-			if (!existingNotification) {
-				// Determine transaction type from currentTxId prefix
+			// Use functional update to check if notification exists without depending on notifications state
+			setNotifications((prev) => {
+				// Check if notification already exists
+				const existingNotification = prev.find(n => n.id === currentTxId);
+				
+				if (existingNotification) {
+					// Update existing notification with txHash if it doesn't have it
+					if (!existingNotification.txHash) {
+						return prev.map((n) =>
+							n.id === currentTxId
+								? { ...n, txHash }
+								: n
+						);
+					}
+					return prev; // No change needed
+				}
+				
+				// Create new notification if it doesn't exist
 				const isApproval = currentTxId.startsWith("approve-");
 				
 				if (isApproval && tokenIn) {
@@ -578,7 +612,7 @@ export function SwapPage() {
 						message: `Approving ${tokenIn.symbol}`,
 						txHash,
 					};
-					setNotifications((prev) => [...prev, approvalNotification]);
+					return [...prev, approvalNotification];
 				} else if (!isApproval && tokenIn && tokenOut) {
 					// Create swap notification only after transaction is sent to wallet
 					const swapNotification: TransactionNotification = {
@@ -591,20 +625,13 @@ export function SwapPage() {
 						amountOut: amountOut?.toFixed(6),
 						txHash,
 					};
-					setNotifications((prev) => [...prev, swapNotification]);
+					return [...prev, swapNotification];
 				}
-			} else {
-				// Update existing notification with txHash
-				setNotifications((prev) =>
-					prev.map((n) =>
-						n.id === currentTxId
-							? { ...n, txHash }
-							: n
-					)
-				);
-			}
+				
+				return prev; // No change if conditions not met
+			});
 		}
-	}, [txHash, currentTxId, tokenIn, tokenOut, amountIn, amountOut, notifications]);
+	}, [txHash, currentTxId, tokenIn, tokenOut, amountIn, amountOut]);
 
 	// Track errors
 	useEffect(() => {
@@ -622,14 +649,29 @@ export function SwapPage() {
 			);
 			setCurrentTxId(null);
 		} else if (isSwapRejection && currentTxId) {
-			// User rejection - just clear the notification without showing error
-			setNotifications((prev) =>
-				prev.filter((n) => n.id !== currentTxId)
-			);
-			setCurrentTxId(null);
-			setError(null);
+			// User rejection
+			const isApprovalTx = currentTxId.startsWith("approve-");
+			
+			if (isApprovalTx) {
+				// For approval rejections, show error message and reset approval state
+				setError("Transaction was declined. The approval was cancelled.");
+				setIsApprovingToken(false);
+				setNotifications((prev) =>
+					prev.filter((n) => n.id !== currentTxId)
+				);
+				setCurrentTxId(null);
+				// Reset the swap hook to clear its error state
+				resetSwap();
+			} else {
+				// For swap rejections, just clear the notification without showing error
+				setNotifications((prev) =>
+					prev.filter((n) => n.id !== currentTxId)
+				);
+				setCurrentTxId(null);
+				setError(null);
+			}
 		}
-	}, [swapError, swapErrorMessage, isSwapRejection, currentTxId]);
+	}, [swapError, swapErrorMessage, isSwapRejection, currentTxId, resetSwap]);
 
 	// General status logging
 	useEffect(() => {
@@ -649,6 +691,10 @@ export function SwapPage() {
 	// Handle notification dismissal
 	const handleDismissNotification = (id: string) => {
 		setNotifications((prev) => prev.filter((n) => n.id !== id));
+		// Clear currentTxId if this is the current transaction to prevent recreation
+		if (currentTxId === id) {
+			setCurrentTxId(null);
+		}
 	};
 
 	// Calculate exchange rate - show placeholder if no amount entered
@@ -713,8 +759,17 @@ export function SwapPage() {
 
 				{/* Swap Error State */}
 				{error && (
-					<div className='mb-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm'>
-						{error}
+					<div className='mb-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm relative'>
+						<div className='flex items-start justify-between gap-3'>
+							<span className='flex-1'>{error}</span>
+							<button
+								onClick={() => setError(null)}
+								className='flex-shrink-0 text-red-500 hover:text-red-400 transition-colors'
+								aria-label='Dismiss error'
+							>
+								<FaTimes className='w-4 h-4' />
+							</button>
+						</div>
 					</div>
 				)}
 
