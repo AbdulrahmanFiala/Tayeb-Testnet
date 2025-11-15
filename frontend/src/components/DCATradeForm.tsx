@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
-import { parseUnits } from "viem";
+import { useState, useEffect, useMemo } from "react";
+import { parseUnits, formatUnits } from "viem";
 import type { Address } from "viem";
 import { usePublicClient, useAccount } from "wagmi";
-import type { Token } from "../types";
+import type { Token, DCAConfirmationData } from "../types";
 import { TokenSelector } from "./TokenSelector";
 import { useTokenBalance } from "../hooks/useTokenBalance";
 import { ERC20_ABI } from "../config/abis";
 import { CONTRACTS } from "../config/contracts";
 import deployedContracts from "../../../config/deployedContracts.json";
+import { DCAConfirmationModal } from "./DCAConfirmationModal";
 
 const SHARIA_DCA_ADDRESS = (
 	deployedContracts as unknown as { main: { shariaDCA: string } }
@@ -83,6 +84,9 @@ export function DCATradeForm({
 	}, [interval]);
 	
 	const [duration, setDuration] = useState<string>(DEFAULT_DURATION);
+	
+	const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+	const [confirmationData, setConfirmationData] = useState<DCAConfirmationData | null>(null);
 	
 	const [needsApproval, setNeedsApproval] = useState(false);
 	const [checkingAllowance, setCheckingAllowance] = useState(false);
@@ -209,9 +213,12 @@ export function DCATradeForm({
 				return;
 			}
 			
-			// Calculate total amount needed (amount per interval * total intervals)
-			const amountPerInterval = parseUnits(amount, sourceToken.decimals);
+			// Calculate total amount needed (amount is total budget per form label "FOR TOTAL BUDGET")
+			// The contract will transfer amountPerInterval * totalIntervals, so calculate that
+			const totalBudget = parseUnits(amount, sourceToken.decimals);
 			const totalIntervals = BigInt(duration || DEFAULT_DURATION);
+			const amountPerInterval = totalBudget / totalIntervals;
+			// Calculate what contract will actually transfer (may be slightly less than totalBudget due to division)
 			const totalAmount = amountPerInterval * totalIntervals;
 			
 			const tokenAddress = getTokenAddress(sourceToken);
@@ -302,11 +309,40 @@ export function DCATradeForm({
 	};
 
 	const handleSchedule = () => {
-		if (!isValid() || !sourceToken || !targetToken) {
+		if (!isValid() || !sourceToken || !targetToken || !precisionInfo) {
 			alert("Please fill in all fields with valid values");
 			return;
 		}
 
+		// Calculate interval seconds
+		const intervalSeconds = 
+			interval === "hour" ? 3600 :
+			interval === "day" ? 86400 :
+			604800; // week
+
+		// Prepare confirmation data
+		const data: DCAConfirmationData = {
+			sourceToken,
+			targetToken,
+			totalBudget: amount,
+			amountPerInterval: precisionInfo.amountPerIntervalDisplay,
+			actualTotalUsed: precisionInfo.actualTotalUsedDisplay,
+			remainder: precisionInfo.remainderDisplay,
+			totalIntervals: precisionInfo.totalIntervals,
+			interval,
+			intervalSeconds,
+		};
+
+		setConfirmationData(data);
+		setShowConfirmationModal(true);
+	};
+
+	const handleConfirmSchedule = () => {
+		setShowConfirmationModal(false);
+		
+		if (!sourceToken || !targetToken) return;
+
+		// Actually call onSchedule to create the order
 		onSchedule?.({
 			sourceToken,
 			targetToken,
@@ -314,6 +350,11 @@ export function DCATradeForm({
 			interval,
 			duration,
 		});
+	};
+
+	const handleCancelConfirmation = () => {
+		setShowConfirmationModal(false);
+		setConfirmationData(null);
 	};
 
 	// Helper to check if approval can proceed (simpler check than hasRequiredFields)
@@ -365,6 +406,57 @@ export function DCATradeForm({
 		setTargetToken(tempToken);
 	};
 	
+	// Helper to format amount with smart decimal places
+	const formatAmountSmart = (amountStr: string, decimals: number): string => {
+		const num = parseFloat(amountStr);
+		if (num === 0) return "0";
+		
+		// For very small amounts, show more decimals
+		if (num < 0.000001) {
+			return num.toExponential(2);
+		}
+		
+		// For amounts >= 1, show up to 6 decimals
+		if (num >= 1) {
+			return num.toFixed(6).replace(/\.?0+$/, "");
+		}
+		
+		// For amounts < 1, show significant digits
+		const fixed = num.toFixed(decimals);
+		return fixed.replace(/\.?0+$/, "");
+	};
+
+	// Calculate actual amount per interval and remainder (for display)
+	const precisionInfo = useMemo(() => {
+		if (!sourceToken || !amount || !duration || !validateAmount(amount) || !validateDuration(duration)) {
+			return null;
+		}
+
+		try {
+			const totalBudget = parseUnits(amount, sourceToken.decimals);
+			const totalIntervals = BigInt(duration);
+			const amountPerInterval = totalBudget / totalIntervals; // Floor division
+			const actualTotalUsed = amountPerInterval * totalIntervals;
+			const remainder = totalBudget - actualTotalUsed;
+
+			const amountPerIntervalStr = formatUnits(amountPerInterval, sourceToken.decimals);
+			const remainderStr = remainder > 0n ? formatUnits(remainder, sourceToken.decimals) : null;
+			const actualTotalUsedStr = formatUnits(actualTotalUsed, sourceToken.decimals);
+
+			return {
+				amountPerInterval,
+				actualTotalUsed,
+				remainder,
+				amountPerIntervalDisplay: formatAmountSmart(amountPerIntervalStr, sourceToken.decimals),
+				remainderDisplay: remainderStr ? formatAmountSmart(remainderStr, sourceToken.decimals) : null,
+				actualTotalUsedDisplay: formatAmountSmart(actualTotalUsedStr, sourceToken.decimals),
+				totalIntervals: parseInt(duration),
+			};
+		} catch {
+			return null;
+		}
+	}, [sourceToken, amount, duration]);
+
 	// Helper to get button text based on state
 	const getButtonText = (): string => {
 		if (needsApproval) {
@@ -491,6 +583,16 @@ export function DCATradeForm({
 					)}
 				</div>
 			</div>
+
+			{/* DCA Confirmation Modal */}
+			{confirmationData && (
+				<DCAConfirmationModal
+					data={confirmationData}
+					isOpen={showConfirmationModal}
+					onConfirm={handleConfirmSchedule}
+					onCancel={handleCancelConfirmation}
+				/>
+			)}
 		</div>
 	);
 }

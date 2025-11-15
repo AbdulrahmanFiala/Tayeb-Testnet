@@ -94,3 +94,15 @@ export interface SwapRecord {
 	tokenInSymbol: string;
 	tokenOutSymbol: string;
 }
+
+export interface DCAConfirmationData {
+	sourceToken: Token;
+	targetToken: Token;
+	totalBudget: string;
+	amountPerInterval: string;
+	actualTotalUsed: string;
+	remainder: string | null;
+	totalIntervals: number;
+	interval: "hour" | "day" | "week";
+	intervalSeconds: number;
+}

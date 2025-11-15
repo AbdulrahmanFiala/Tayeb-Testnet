@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
 import type { Address } from "viem";
 import { DCAOrdersList } from "../components/DCAOrdersList";
 import { DCATradeForm } from "../components/DCATradeForm";
@@ -10,7 +10,7 @@ import { TransactionNotificationList } from "../components/TransactionNotificati
 import { ConfirmModal } from "../components/ConfirmModal";
 import { getFriendlyErrorMessage, isUserRejection } from "../utils/errorMessages";
 import { CONTRACTS } from "../config/contracts";
-import halaCoinsData from "../../../config/halaCoins.json";
+import tayebCoinsData from "../../../config/tayebCoins.json";
 import type { Token, TransactionNotification } from "../types";
 
 export const DCAOrdersPage: React.FC = () => {
@@ -52,11 +52,11 @@ export const DCAOrdersPage: React.FC = () => {
 		return (isApproving || isConfirming) && currentTxId?.startsWith("dca-approve-") === true;
 	}, [isApproving, isConfirming, currentTxId]);
 
-	// Format tokens: merge smart contract data with halaCoins.json metadata
+	// Format tokens: merge smart contract data with tayebCoins.json metadata
 	const tokens: Token[] = useMemo(() => {
 		return (coins || []).map((coin) => {
-			const halaCoins = (
-				halaCoinsData as {
+			const tayebCoins = (
+				tayebCoinsData as {
 					coins: Array<{
 						symbol: string;
 						decimals: number;
@@ -64,7 +64,7 @@ export const DCAOrdersPage: React.FC = () => {
 					}>;
 				}
 			).coins;
-			const coinMetadata = halaCoins.find(
+			const coinMetadata = tayebCoins.find(
 				(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
 					c.symbol.toLowerCase() === coin.symbol.toLowerCase()
 			);
@@ -119,16 +119,36 @@ export const DCAOrdersPage: React.FC = () => {
 			// Approve token (will prompt to switch network if needed)
 			await approveToken(token.addresses.moonbase as Address, amount);
 		} catch (error: any) {
-			// Network switch errors will be caught and shown in the notification
-			const errorMessage = error?.message || "Failed to approve token";
-			setNotifications((prev) =>
-				prev.map((n) =>
-					n.id === txId
-						? { ...n, status: "error", message: errorMessage }
-						: n
-				)
-			);
-			setCurrentTxId(null);
+			// Check if user rejected the transaction
+			const isRejection = isUserRejection(error);
+			
+			if (isRejection) {
+				// User declined - show friendly message and clear notification
+				setNotifications((prev) =>
+					prev.map((n) =>
+						n.id === txId
+							? { ...n, status: "error", message: "Transaction was declined. The approval was cancelled." }
+							: n
+					)
+				);
+				// Keep notification visible briefly, then remove it after showing the error
+				setTimeout(() => {
+					setNotifications((prev) => prev.filter((n) => n.id !== txId));
+					setCurrentTxId(null);
+					resetWrite();
+				}, 3000);
+			} else {
+				// Real error - show error message
+				const friendlyMessage = getFriendlyErrorMessage(error);
+				setNotifications((prev) =>
+					prev.map((n) =>
+						n.id === txId
+							? { ...n, status: "error", message: friendlyMessage }
+							: n
+					)
+				);
+				setCurrentTxId(null);
+			}
 		}
 	};
 
@@ -155,8 +175,24 @@ export const DCAOrdersPage: React.FC = () => {
 		]);
 
 		// Parse values
-		const amountPerInterval = parseUnits(data.amount, data.sourceToken.decimals);
+		// PRECISION HANDLING: User enters total budget, divide by intervals with floor division
+		// Option 2: Round down (floor division) + inform user about remainder
+		const totalBudget = parseUnits(data.amount, data.sourceToken.decimals);
 		const totalIntervals = BigInt(data.duration);
+		const amountPerInterval = totalBudget / totalIntervals; // Floor division (rounds down)
+		const actualTotalUsed = amountPerInterval * totalIntervals; // Actual amount that will be used
+		const remainder = totalBudget - actualTotalUsed; // Remaining amount that won't be used
+
+		// Show warning if there's a remainder (precision loss)
+		if (remainder > 0n) {
+			const remainderDisplay = formatUnits(remainder, data.sourceToken.decimals);
+			const amountPerIntervalDisplay = formatUnits(amountPerInterval, data.sourceToken.decimals);
+			console.log(
+				`Note: Due to precision, ${remainderDisplay} ${data.sourceToken.symbol} ` +
+				`remainder will not be used. Actual amount per interval: ${amountPerIntervalDisplay} ${data.sourceToken.symbol}`
+			);
+		}
+
 		const intervalSeconds = 
 			data.interval === "hour" ? BigInt(3600) :
 			data.interval === "day" ? BigInt(86400) :
@@ -170,16 +206,18 @@ export const DCAOrdersPage: React.FC = () => {
 			// Create order (will prompt to switch network if needed)
 			if (isNativeDEV) {
 				// Use native DEV function (no approval needed)
-				const totalValue = amountPerInterval * totalIntervals;
+				// Send totalBudget - contract will use actualTotalUsed and automatically refund remainder
 				await createDCAOrderWithDEV(
 					data.targetToken.addresses.moonbase as Address,
 					amountPerInterval,
 					intervalSeconds,
 					totalIntervals,
-					totalValue
+					totalBudget // Contract refunds remainder automatically
 				);
 			} else {
 				// Use regular token function (requires approval)
+				// Contract will transfer actualTotalUsed (amountPerInterval * totalIntervals)
+				// Approval check in DCATradeForm already uses actualTotalUsed, so this is safe
 				await createDCAOrderWithToken(
 					data.sourceToken.addresses.moonbase as Address,
 					data.targetToken.addresses.moonbase as Address,
@@ -316,12 +354,35 @@ export const DCAOrdersPage: React.FC = () => {
 			const friendlyMessage = getFriendlyErrorMessage(error);
 			
 			if (isRejection) {
-				// User rejection - just remove the notification without showing error
-				console.log("❌ User rejected transaction");
-				setNotifications((prev) =>
-					prev.filter((n) => n.id !== currentTxId)
-				);
-				setCurrentTxId(null);
+				// User rejection
+				const isApprovalTx = currentTxId.startsWith("dca-approve-");
+				
+				if (isApprovalTx) {
+					// For approval rejections, show error message briefly
+					console.log("❌ User rejected approval transaction");
+					const rejectionMessage = "Transaction was declined. The approval was cancelled.";
+					setNotifications((prev) =>
+						prev.map((n) =>
+							n.id === currentTxId
+								? { ...n, status: "error", message: rejectionMessage }
+								: n
+						)
+					);
+					// Remove notification after showing error briefly
+					setTimeout(() => {
+						setNotifications((prev) => prev.filter((n) => n.id !== currentTxId));
+						setCurrentTxId(null);
+						resetWrite();
+					}, 3000);
+				} else {
+					// For other rejections, just remove the notification without showing error
+					console.log("❌ User rejected transaction");
+					setNotifications((prev) =>
+						prev.filter((n) => n.id !== currentTxId)
+					);
+					setCurrentTxId(null);
+					resetWrite();
+				}
 			} else {
 				// Real error - update notification to error
 				console.log("❌ Transaction ERROR:", friendlyMessage);
@@ -335,7 +396,7 @@ export const DCAOrdersPage: React.FC = () => {
 				setCurrentTxId(null);
 			}
 		}
-	}, [writeError, confirmError, currentTxId]);
+	}, [writeError, confirmError, currentTxId, resetWrite]);
 
 	// Handle notification dismissal
 	const handleDismissNotification = (id: string) => {
