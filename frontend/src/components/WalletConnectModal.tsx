@@ -7,11 +7,72 @@ interface WalletConnectModalProps {
 	onClose: () => void;
 }
 
+// Helper function to check if SubWallet is installed
+const isSubWalletInstalled = () => {
+	if (typeof window === "undefined") return false;
+	
+	// Check for window.injectedWeb3 (SubWallet's Substrate injection)
+	if ((window as any).injectedWeb3 && (window as any).injectedWeb3['subwallet-js']) {
+		return true;
+	}
+	
+	// Check for window.subwallet (direct injection)
+	if ((window as any).subwallet) return true;
+	
+	// Check if window.ethereum exists
+	if (!window.ethereum) return false;
+	
+	// Check for isSubWallet flag
+	if ((window.ethereum as any).isSubWallet === true) return true;
+	
+	// Check if ethereum.providers array exists (multiple wallets installed)
+	if (Array.isArray((window.ethereum as any).providers)) {
+		return (window.ethereum as any).providers.some((provider: any) => {
+			return provider.isSubWallet === true || 
+				   provider.isSubWallet !== undefined ||
+				   (provider.providerName && provider.providerName.toLowerCase().includes("subwallet")) ||
+				   (provider.constructor?.name && provider.constructor.name.toLowerCase().includes("subwallet"));
+		});
+	}
+	
+	// Check provider name/identifier
+	const providerName = (window.ethereum as any).providerName || 
+						  (window.ethereum as any).constructor?.name || 
+						  "";
+	if (providerName.toLowerCase().includes("subwallet")) return true;
+	
+	// Check for SubWallet in the provider's info
+	const providerInfo = (window.ethereum as any).providerInfo || {};
+	if (providerInfo.name && providerInfo.name.toLowerCase().includes("subwallet")) {
+		return true;
+	}
+	
+	return false;
+};
+
 // Wallet metadata for display
 const getWalletInfo = (connector: Connector) => {
 	const name = connector.name.toLowerCase();
 	
-	// Determine wallet type and icon
+	// Check for SubWallet first (before MetaMask check since both use injected)
+	// SubWallet injects window.subwallet or sets window.ethereum.isSubWallet
+	if (name.includes("subwallet") || (connector.id === "injected" && isSubWalletInstalled())) {
+		return {
+			name: "SubWallet",
+			icon: (
+				<img 
+					src="/subwallet-icon.webp" 
+					alt="SubWallet" 
+					width="32" 
+					height="32"
+					style={{ borderRadius: "6px" }}
+				/>
+			),
+			description: "Connect using SubWallet browser extension",
+		};
+	}
+	
+	// Determine wallet type and icon (MetaMask or other injected wallets)
 	if (name.includes("metamask") || connector.id === "injected") {
 		return {
 			name: "MetaMask",
@@ -70,9 +131,10 @@ const getWalletInfo = (connector: Connector) => {
 // Check if wallet is installed/available
 const isWalletInstalled = (connector: Connector) => {
 	if (connector.id === "injected") {
-		return typeof window !== "undefined" && 
-			(window.ethereum !== undefined || 
-			 (window as any).web3 !== undefined);
+		const hasEthereum = typeof window !== "undefined" && window.ethereum !== undefined;
+		const hasSubWallet = isSubWalletInstalled();
+		const hasWeb3 = typeof window !== "undefined" && (window as any).web3 !== undefined;
+		return hasEthereum || hasSubWallet || hasWeb3;
 	}
 	// WalletConnect and Coinbase are always available
 	return true;
@@ -158,14 +220,46 @@ export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps)
 
 	if (!isOpen) return null;
 
-	// Filter to only show MetaMask
+	// Filter and potentially duplicate connectors to show both MetaMask and SubWallet separately
 	const availableConnectors = connectors.filter((connector) => {
 		const name = connector.name.toLowerCase();
-		// Only include MetaMask (injected connector)
-		return (
-			name.includes("metamask") ||
-			connector.id === "injected"
-		);
+		const isInjected = connector.id === "injected";
+		
+		// Show injected connector (covers both MetaMask and SubWallet)
+		// The getWalletInfo function will determine which wallet to display based on detection
+		return name.includes("metamask") || name.includes("subwallet") || isInjected;
+	});
+
+	// If SubWallet is installed and we have an injected connector, create a separate entry for it
+	// This allows showing both MetaMask and SubWallet when both are available
+	const connectorsToShow: Array<{ connector: Connector; walletType?: 'subwallet' | 'metamask' }> = [];
+	const hasSubWallet = isSubWalletInstalled();
+	const hasMetaMask = typeof window !== "undefined" && 
+		(window.ethereum?.isMetaMask === true || 
+		 (window.ethereum as any)?.providers?.some((p: any) => p.isMetaMask === true));
+
+	availableConnectors.forEach((connector) => {
+		if (connector.id === "injected") {
+			// If both wallets are installed, show both options separately
+			if (hasSubWallet && hasMetaMask) {
+				// Add SubWallet entry first
+				connectorsToShow.push({ connector, walletType: 'subwallet' });
+				// Add MetaMask entry
+				connectorsToShow.push({ connector, walletType: 'metamask' });
+			} else if (hasSubWallet) {
+				// Only SubWallet is installed, show it explicitly
+				connectorsToShow.push({ connector, walletType: 'subwallet' });
+			} else if (hasMetaMask) {
+				// Only MetaMask is installed, show it normally
+				connectorsToShow.push({ connector });
+			} else {
+				// No specific wallet detected, but injected connector exists - show generic
+				// This handles cases where wallet detection might not work perfectly
+				connectorsToShow.push({ connector });
+			}
+		} else {
+			connectorsToShow.push({ connector });
+		}
 	});
 
 	return (
@@ -221,21 +315,54 @@ export function WalletConnectModal({ isOpen, onClose }: WalletConnectModalProps)
 
 				{/* Wallet List */}
 				<div className="space-y-2 mb-6">
-					{availableConnectors.length === 0 ? (
+					{connectorsToShow.length === 0 ? (
 						<div className="text-center py-8">
 							<p className="text-white/60 text-sm">
 								No wallets available. Please install a wallet extension.
 							</p>
 						</div>
 					) : (
-						availableConnectors.map((connector) => {
-							const walletInfo = getWalletInfo(connector);
+						connectorsToShow.map(({ connector, walletType }, index) => {
+							// Override wallet info if walletType is specified
+							let walletInfo = getWalletInfo(connector);
+							if (walletType === 'subwallet') {
+								walletInfo = {
+									name: "SubWallet",
+									icon: (
+										<img 
+											src="/subwallet-icon.webp" 
+											alt="SubWallet" 
+											width="32" 
+											height="32"
+											style={{ borderRadius: "6px" }}
+										/>
+									),
+									description: "Connect using SubWallet browser extension",
+								};
+							} else if (walletType === 'metamask') {
+								walletInfo = {
+									name: "MetaMask",
+									icon: (
+										<img 
+											src="https://images.ctfassets.net/clixtyxoaeas/4rnpEzy1ATWRKVBOLxZ1Fm/a74dc1eed36d23d7ea6030383a4d5163/MetaMask-icon-fox.svg" 
+											alt="MetaMask" 
+											width="32" 
+											height="32"
+											style={{ borderRadius: "6px" }}
+										/>
+									),
+									description: "Connect using MetaMask browser extension",
+								};
+							}
+							
 							const isInstalled = isWalletInstalled(connector);
+							// Use a unique key that includes walletType when both wallets are shown
+							const uniqueKey = walletType ? `${connector.id}-${walletType}-${index}` : connector.id;
 							const isConnectingThis = isConnecting && connectingId === connector.id;
 
 							return (
 								<button
-									key={connector.id}
+									key={uniqueKey}
 									onClick={() => handleConnect(connector)}
 									disabled={isConnectingThis || !isInstalled}
 									className={`
