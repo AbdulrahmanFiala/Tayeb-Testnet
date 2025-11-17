@@ -30,6 +30,20 @@ export function HomePage() {
 				<p className='text-xl text-[#92c9b7] mb-8'>
 					The First Fully Sharia-Compliant DEX for Halal Crypto Trading
 				</p>
+				<div className='mb-8 p-4 bg-[#23483c]/50 border border-primary/30 rounded-lg'>
+					<p className='text-[#92c9b7] text-sm md:text-base'>
+						<strong className='text-primary'>Getting Started:</strong> Grab some DEV tokens from the{" "}
+						<a
+							href='https://faucet.moonbeam.network/'
+							target='_blank'
+							rel='noopener noreferrer'
+							className='text-primary hover:underline font-semibold'
+						>
+							Moonbase Alpha faucet
+						</a>{" "}
+						→ Begin exploring the app and swapping into other tokens 🚀
+					</p>
+				</div>
 				<div className='flex gap-4 justify-center flex-wrap'>
 					<button
 						onClick={() => navigate("/swap")}

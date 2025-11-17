@@ -1,5 +1,7 @@
 # Project Story
 
+**Getting Started: Grab some DEV tokens from the [Moonbase Alpha faucet](https://faucet.moonbeam.network/) → Begin exploring the app and swapping into other tokens 🚀**
+
 *About the project*  
 Be sure to write what inspired you, what you learned, how you built your project, and the challenges you faced. Format your story in Markdown, with LaTeX support for math.
 

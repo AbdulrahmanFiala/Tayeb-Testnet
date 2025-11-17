@@ -1,5 +1,7 @@
 # Tayeb - Sharia Compliant DeFi Platform
 
+**Getting Started: Grab some DEV tokens from the [Moonbase Alpha faucet](https://faucet.moonbeam.network/) → Begin exploring the app and swapping into other tokens 🚀**
+
 The first-of-its-kind decentralized platform for Sharia-compliant cryptocurrency investment, built with Solidity smart contracts for Moonbase Alpha (Moonbeam Testnet).
 
 ## 🌟 Features
