@@ -53,33 +53,36 @@ export const DCAOrdersPage: React.FC = () => {
 	}, [isApproving, isConfirming, currentTxId]);
 
 	// Format tokens: merge smart contract data with tayebCoins.json metadata
+	// Filter out non-compliant tokens (only show verified tokens for DCA)
 	const tokens: Token[] = useMemo(() => {
-		return (coins || []).map((coin) => {
-			const tayebCoins = (
-				tayebCoinsData as {
-					coins: Array<{
-						symbol: string;
-						decimals: number;
-						avgSlippagePercent: number;
-					}>;
-				}
-			).coins;
-			const coinMetadata = tayebCoins.find(
-				(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
-					c.symbol.toLowerCase() === coin.symbol.toLowerCase()
-			);
+		return (coins || [])
+			.filter((coin) => coin.verified) // Only include Sharia-compliant tokens
+			.map((coin) => {
+				const tayebCoins = (
+					tayebCoinsData as {
+						coins: Array<{
+							symbol: string;
+							decimals: number;
+							avgSlippagePercent: number;
+						}>;
+					}
+				).coins;
+				const coinMetadata = tayebCoins.find(
+					(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
+						c.symbol.toLowerCase() === coin.symbol.toLowerCase()
+				);
 
-			return {
-				symbol: coin.symbol,
-				name: coin.name,
-				decimals: coinMetadata?.decimals ?? 18,
-				description: coin.complianceReason,
-				complianceReason: coin.complianceReason,
-				addresses: { moonbase: coin.tokenAddress },
-				permissible: coin.verified,
-				avgSlippagePercent: coinMetadata?.avgSlippagePercent,
-			};
-		});
+				return {
+					symbol: coin.symbol,
+					name: coin.name,
+					decimals: coinMetadata?.decimals ?? 18,
+					description: coin.complianceReason,
+					complianceReason: coin.complianceReason,
+					addresses: { moonbase: coin.tokenAddress },
+					permissible: coin.verified,
+					avgSlippagePercent: coinMetadata?.avgSlippagePercent,
+				};
+			});
 	}, [coins]);
 
 	// Handle DCA scheduling (called when user clicks schedule button)

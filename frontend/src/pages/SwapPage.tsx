@@ -120,35 +120,38 @@ export function SwapPage() {
 
 
 	// Format tokens: merge smart contract data with tayebCoins.json metadata
-	const tokens: Token[] = (coins || []).map((coin) => {
-		// Find matching coin metadata from tayebCoins.json
-		const tayebCoins = (
-			tayebCoinsData as {
-				coins: Array<{
-					symbol: string;
-					decimals: number;
-					avgSlippagePercent: number;
-				}>;
-			}
-		).coins;
-		const coinMetadata = tayebCoins.find(
-			(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
-				c.symbol.toLowerCase() === coin.symbol.toLowerCase()
-		);
+	// Filter out non-compliant tokens (only show verified tokens for swapping)
+	const tokens: Token[] = (coins || [])
+		.filter((coin) => coin.verified) // Only include Sharia-compliant tokens
+		.map((coin) => {
+			// Find matching coin metadata from tayebCoins.json
+			const tayebCoins = (
+				tayebCoinsData as {
+					coins: Array<{
+						symbol: string;
+						decimals: number;
+						avgSlippagePercent: number;
+					}>;
+				}
+			).coins;
+			const coinMetadata = tayebCoins.find(
+				(c: { symbol: string; decimals: number; avgSlippagePercent: number }) =>
+					c.symbol.toLowerCase() === coin.symbol.toLowerCase()
+			);
 
-		return {
-			symbol: coin.symbol,
-			name: coin.name,
-			// Use decimals from tayebCoins.json; default to 18
-			decimals: coinMetadata?.decimals ?? 18,
-			description: coin.complianceReason,
-			complianceReason: coin.complianceReason,
-			addresses: { moonbase: coin.tokenAddress },
-			permissible: coin.verified,
-			// Include avgSlippagePercent from tayebCoins.json
-			avgSlippagePercent: coinMetadata?.avgSlippagePercent,
-		};
-	});
+			return {
+				symbol: coin.symbol,
+				name: coin.name,
+				// Use decimals from tayebCoins.json; default to 18
+				decimals: coinMetadata?.decimals ?? 18,
+				description: coin.complianceReason,
+				complianceReason: coin.complianceReason,
+				addresses: { moonbase: coin.tokenAddress },
+				permissible: coin.verified,
+				// Include avgSlippagePercent from tayebCoins.json
+				avgSlippagePercent: coinMetadata?.avgSlippagePercent,
+			};
+		});
 
 	// Initialize token selections when tokens load
 	useEffect(() => {

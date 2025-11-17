@@ -42,6 +42,7 @@ const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
 	XLM: "stellar",
 	SUI: "sui",
 	AVAX: "avalanche-2",
+	HYPE: "hyperliquid",
 	DEV: "moonbeam", // Moonbase native token - using Moonbeam as proxy
 	GLMR: "moonbeam",
 };

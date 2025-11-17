@@ -96,10 +96,10 @@ export function TokensPage() {
 			<div className='flex flex-wrap justify-between gap-4 px-4'>
 				<div className='flex min-w-72 flex-col gap-3'>
 					<p className='text-white text-4xl font-black leading-tight tracking-[-0.033em]'>
-						Explore Sharia-Compliant Tokens
+						Explore All Tokens
 					</p>
 					<p className='text-[#92c9b7] text-base font-normal leading-normal'>
-						Discover a curated list of Sharia-compliant crypto tokens.
+						View all registered tokens with Sharia compliance status, prices, and market cap.
 					</p>
 				</div>
 			</div>
@@ -282,7 +282,7 @@ export function TokensPage() {
 															: "—"}
 													</td>
 													<td className='h-[72px] px-4 py-2 text-sm font-normal leading-normal'>
-														{token.verified && (
+														{token.verified ? (
 															<div
 																className='flex items-center gap-2 text-xs font-medium text-green-400 bg-green-500/10 rounded-full px-3 py-1 w-fit'
 																title={token.complianceReason}
@@ -292,20 +292,32 @@ export function TokensPage() {
 																</span>
 																<span>Compliant</span>
 															</div>
+														) : (
+															<div
+																className='flex items-center gap-2 text-xs font-medium text-red-400 bg-red-500/10 rounded-full px-3 py-1 w-fit'
+																title={token.complianceReason}
+															>
+																<span className='material-symbols-outlined text-sm'>
+																	cancel
+																</span>
+																<span>Non-Compliant</span>
+															</div>
 														)}
 													</td>
 													<td className='h-[72px] px-4 py-2 text-sm font-normal leading-normal'>
 														{token.complianceReason}
 													</td>
 													<td className='h-[72px] px-4 py-2 text-right'>
-														<button
-															onClick={() =>
-																navigate(`/swap?tokenIn=${token.symbol}`)
-															}
-															className='bg-primary/20 text-primary hover:bg-primary hover:text-background-dark transition-colors duration-200 font-bold text-sm h-9 px-4 rounded-lg'
-														>
-															Swap
-														</button>
+														{token.verified && (
+															<button
+																onClick={() =>
+																	navigate(`/swap?tokenIn=${token.symbol}`)
+																}
+																className='bg-primary/20 text-primary hover:bg-primary hover:text-background-dark transition-colors duration-200 font-bold text-sm h-9 px-4 rounded-lg'
+															>
+																Swap
+															</button>
+														)}
 													</td>
 												</tr>
 											);
@@ -338,12 +350,21 @@ export function TokensPage() {
 													<p className='text-[#92c9b7] text-sm'>{token.symbol}</p>
 												</div>
 											</div>
-											<div className='flex items-center gap-2 text-xs font-medium text-green-400 bg-green-500/10 rounded-full px-3 py-1'>
-												<span className='material-symbols-outlined text-sm'>
-													verified
-												</span>
-												<span>Compliant</span>
-											</div>
+											{token.verified ? (
+												<div className='flex items-center gap-2 text-xs font-medium text-green-400 bg-green-500/10 rounded-full px-3 py-1'>
+													<span className='material-symbols-outlined text-sm'>
+														verified
+													</span>
+													<span>Compliant</span>
+												</div>
+											) : (
+												<div className='flex items-center gap-2 text-xs font-medium text-red-400 bg-red-500/10 rounded-full px-3 py-1'>
+													<span className='material-symbols-outlined text-sm'>
+														cancel
+													</span>
+													<span>Non-Compliant</span>
+												</div>
+											)}
 										</div>
 										<div className='flex justify-between items-center'>
 											<div>
@@ -367,12 +388,14 @@ export function TokensPage() {
 												</p>
 											</div>
 										</div>
-										<button
-											onClick={() => navigate(`/swap?tokenIn=${token.symbol}`)}
-											className='w-full bg-primary text-background-dark hover:opacity-90 transition-opacity font-bold text-sm h-10 px-4 rounded-lg'
-										>
-											Swap
-										</button>
+										{token.verified && (
+											<button
+												onClick={() => navigate(`/swap?tokenIn=${token.symbol}`)}
+												className='w-full bg-primary text-background-dark hover:opacity-90 transition-opacity font-bold text-sm h-10 px-4 rounded-lg'
+											>
+												Swap
+											</button>
+										)}
 									</div>
 								);
 							})}
