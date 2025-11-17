@@ -9,10 +9,10 @@ I was inspired by how Islamic banking transformed the financial landscape in Mus
 
 According to the **IFSB**, in some key jurisdictions Islamic banking now represents a large share of total banking assets. For example, as of 2024:
 
-- **Saudi Arabia**: Islamic banking makes up ~74.96% of total banking assets. ([IFSB](https://www.ifsb.org))  
-- **Kuwait**: Islamic banking is about ~60.6% of total banking assets. ([IFSB](https://www.ifsb.org))  
-- **Malaysia**: Islamic banking is ~33.2% of total banking assets. ([IFSB](https://www.ifsb.org))  
-- **UAE**: Islamic banking is ~23.2% of total banking assets. ([IFSB](https://www.ifsb.org))  
+- **Saudi Arabia**: Islamic banking makes up ~74.96% of total banking assets. 
+- **Kuwait**: Islamic banking is about ~60.6% of total banking assets. 
+- **Malaysia**: Islamic banking is ~33.2% of total banking assets. 
+- **UAE**: Islamic banking is ~23.2% of total banking assets. 
 
 This data showed me that Islamic banking is not only growing fast, but is deeply embedded in some national banking systems. That inspired me to build **Tayeb** — the first Sharia‑compliant DEX — to bring the principles of Islamic finance into the world of decentralized finance, and serve a market with real scale and potential.
 
@@ -56,8 +56,5 @@ Building Tayeb required navigating several technical and ecosystem limitations:
   - No testnet liquidity pools, outdated mainnet SDK, and limited developer support.  
   - I **built my own liquidity pool contracts on Moonbase Alpha testnet** for testing.
 
-- **Moonbeam XCM SDK Failures**  
-  - Official XCM SDK was unreliable.  
-  - I **integrated ParaSpell XCM in the mainnet version (currently under development)** for stable cross-chain routing and improved documentation.
 
 These challenges revealed critical gaps in EVM-compatible cross-chain tooling and shaped my architectural decisions to prioritize flexibility and mainnet validation.
