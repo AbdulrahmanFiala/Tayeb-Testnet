@@ -69,9 +69,14 @@ export function DCAConfirmationModal({
 					{/* Arrow Down */}
 					<div className='flex justify-center my-3'>
 						<div className='flex items-center justify-center size-10 rounded-full bg-[#23483c]'>
-							<span className='material-symbols-outlined text-primary'>
-								arrow_downward
-							</span>
+							<svg
+								className='w-5 h-5 text-primary'
+								fill='currentColor'
+								viewBox='0 0 24 24'
+								xmlns='http://www.w3.org/2000/svg'
+							>
+								<path d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z' />
+							</svg>
 						</div>
 					</div>
 

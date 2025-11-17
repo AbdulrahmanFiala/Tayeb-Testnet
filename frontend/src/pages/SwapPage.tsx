@@ -793,9 +793,14 @@ export function SwapPage() {
 								onClick={swapTokens}
 								className='flex items-center justify-center size-12 bg-[#23483c] border-4 border-solid border-[#1a3a2f] rounded-full text-primary hover:bg-[#2c5a4b] transition-colors'
 							>
-								<span className='material-symbols-outlined'>
-									arrow_downward
-								</span>
+								<svg
+									className='w-6 h-6'
+									fill='currentColor'
+									viewBox='0 0 24 24'
+									xmlns='http://www.w3.org/2000/svg'
+								>
+									<path d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z' />
+								</svg>
 							</button>
 						</div>
 						{/* To Token Section */}
