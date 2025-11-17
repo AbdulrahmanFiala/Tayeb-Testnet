@@ -27,6 +27,7 @@ const TOKEN_LOGOS: Record<string, string> = {
 	SUI: "https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg",
 	HBAR: "https://assets.coingecko.com/coins/images/3688/small/hbar.png",
 	AVAX: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+	HYPE: "https://coin-images.coingecko.com/coins/images/50882/small/hyperliquid.jpg?1729431300",
 	// Fallback for custom tokens
 	SHARIA: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
 	TAYEB: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
@@ -57,6 +58,7 @@ const TOKEN_COLORS: Record<string, string> = {
 	SUI: "#6FBCF0",
 	HBAR: "#000000",
 	AVAX: "#E84142",
+	HYPE: "#6366F1",
 	// Custom tokens
 	SHARIA: "#4ADE80",
 	TAYEB: "#4ADE80",

@@ -196,13 +196,25 @@
       "symbol": "DEV",
       "name": "DEV",
       "decimals": 18,
-      "avgSlippagePercent": 1.0,
+      "avgSlippagePercent": 1,
       "complianceReason": "Native gas token for Moonbase Alpha, no interest-bearing mechanism",
       "description": "Native gas token for Moonbase Alpha testnet",
       "addresses": {
         "moonbase": "0xD909178CC99d318e4D46e7E66a972955859670E1"
       },
       "permissible": true
+    },
+    {
+      "symbol": "HYPE",
+      "name": "Hyperliquid",
+      "decimals": 18,
+      "avgSlippagePercent": 2,
+      "complianceReason": "Perpetual DEX platform token with leverage trading mechanisms",
+      "description": "Layer 1 blockchain platform for decentralized perpetual futures trading",
+      "addresses": {
+        "moonbase": "0x957492128c83A87276E681503121bb4E08AdAE4C"
+      },
+      "permissible": false
     }
   ],
   "stablecoins": [
@@ -211,8 +223,7 @@
   ],
   "metadata": {
     "version": "1.0.1",
-    "lastUpdated": "2025-11-14T19:36:38.288Z",
+    "lastUpdated": "2025-11-17T10:11:24.633Z",
     "network": "moonbase"
   }
 }
-

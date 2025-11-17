@@ -236,39 +236,40 @@ export function ShariaScannerPage() {
 			)}
 
 			{/* Results Section */}
-			<div className='px-4 pb-6'>
-				<div className='max-w-7xl mx-auto'>
-					{/* Loading State */}
-					{isScanning && (
-						<div className='flex items-center justify-center h-64'>
-							<div className='text-center'>
-								<span className='material-symbols-outlined text-4xl text-primary animate-spin block mb-2'>
-									sync
-								</span>
-								<p className='text-white text-sm mb-1'>Scanning wallet...</p>
-								<p className='text-[#92c9b7] text-xs'>
-									Checking balances and compliance
-								</p>
+			{!(scanMode === "connected" && !isConnected) && (
+				<div className='px-4 pb-6'>
+					<div className='max-w-7xl mx-auto'>
+						{/* Loading State */}
+						{isScanning && (
+							<div className='flex items-center justify-center h-64'>
+								<div className='text-center'>
+									<span className='material-symbols-outlined text-4xl text-primary animate-spin block mb-2'>
+										sync
+									</span>
+									<p className='text-white text-sm mb-1'>Scanning wallet...</p>
+									<p className='text-[#92c9b7] text-xs'>
+										Checking balances and compliance
+									</p>
+								</div>
 							</div>
-						</div>
-					)}
+						)}
 
-					{/* Results */}
-					{!isScanning && hasScanned && scannedTokens.length === 0 && (
-						<div className='flex items-center justify-center h-64'>
-							<div className='text-center'>
-								<span className='material-symbols-outlined text-4xl text-[#92c9b7] block mb-2'>
-									check_circle
-								</span>
-								<p className='text-white font-medium mb-1'>No Tokens Found</p>
-								<p className='text-[#92c9b7] text-sm'>
-									No tokens with non-zero balances
-								</p>
+						{/* Results */}
+						{!isScanning && hasScanned && scannedTokens.length === 0 && (
+							<div className='flex items-center justify-center h-64'>
+								<div className='text-center'>
+									<span className='material-symbols-outlined text-4xl text-[#92c9b7] block mb-2'>
+										check_circle
+									</span>
+									<p className='text-white font-medium mb-1'>No Tokens Found</p>
+									<p className='text-[#92c9b7] text-sm'>
+										No tokens with non-zero balances
+									</p>
+								</div>
 							</div>
-						</div>
-					)}
+						)}
 
-					{!isScanning && hasScanned && scannedTokens.length > 0 && (
+						{!isScanning && hasScanned && scannedTokens.length > 0 && (
 						<div className='space-y-6'>
 							{/* Scanned Wallet Info - Compact */}
 							<div className='bg-[#19332b] border border-[#326755] rounded-lg p-3'>
@@ -365,8 +366,9 @@ export function ShariaScannerPage() {
 							)}
 						</div>
 					)}
+					</div>
 				</div>
-			</div>
+			)}
 		</div>
 	);
 }
